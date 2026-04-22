@@ -27,6 +27,23 @@ const V3_EXAMPLES = (c) => {
 const V3_STORAGE_KEY = 'qc-v3-state';
 const V3_MAX_CHARS = 120;
 
+/* 크기 프리셋 */
+const V3_SIZES = {
+  S: { width: 140, minHeight: 110, fontSize: 15, label: 'S' },
+  M: { width: 190, minHeight: 140, fontSize: 19, label: 'M' },
+  L: { width: 260, minHeight: 180, fontSize: 23, label: 'L' },
+};
+
+/* 색상 팔레트 */
+const V3_COLORS = [
+  { hex:'#2d2a26', label:'먹' },
+  { hex:'#C0392B', label:'빨강' },
+  { hex:'#1A6FA8', label:'파랑' },
+  { hex:'#1E8449', label:'초록' },
+  { hex:'#D4680A', label:'주황' },
+  { hex:'#6B3FA0', label:'보라' },
+];
+
 function V3Face({type, size=70, talking=false}){
   const eye = type.eyeStyle;
   const mouthPath = {
@@ -58,6 +75,9 @@ const V3DrawCanvas = React.forwardRef(function V3DrawCanvas({ bgColor='#fff', pe
   const isDrawing = React.useRef(false);
   const isDirtyRef = React.useRef(false);
   const [penSize, setPenSize] = React.useState(4);
+  const penColorRef = React.useRef(penColor);
+
+  React.useEffect(() => { penColorRef.current = penColor; }, [penColor]);
 
   React.useEffect(() => {
     const canvas = canvasEl.current;
@@ -101,7 +121,7 @@ const V3DrawCanvas = React.forwardRef(function V3DrawCanvas({ bgColor='#fff', pe
     ctx.lineWidth = penSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = penColor;
+    ctx.strokeStyle = penColorRef.current;
     const { x, y } = getPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -161,6 +181,45 @@ const V3DrawCanvas = React.forwardRef(function V3DrawCanvas({ bgColor='#fff', pe
     </div>
   );
 });
+
+/* 크기·색상 선택 공용 UI (v3 스타일) */
+function V3NoteOptions({ size, onSize, penColor, onPenColor, typeColor, showColor }) {
+  return (
+    <div className="qc-no-print" style={{display:'flex', flexDirection:'column', gap:5}}>
+      <div style={{display:'flex', alignItems:'center', gap:6}}>
+        <span style={{fontFamily:'Jua', fontSize:11, color:'rgba(255,255,255,.85)', minWidth:26}}>크기</span>
+        <div style={{display:'flex', gap:4}}>
+          {Object.entries(V3_SIZES).map(([k, v]) => (
+            <button key={k} onClick={()=>onSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:30, height:24, borderRadius:999,
+              border:'2px solid #2d2a26',
+              background: size===k ? '#2d2a26' : 'rgba(255,255,255,.8)',
+              color: size===k ? '#fff' : '#2d2a26',
+              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+            }}>{v.label}</button>
+          ))}
+        </div>
+      </div>
+      {showColor && (
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:11, color:'rgba(255,255,255,.85)', minWidth:26}}>색</span>
+          <div style={{display:'flex', gap:4}}>
+            {V3_COLORS.map(c => (
+              <button key={c.hex} onClick={()=>onPenColor(c.hex)}
+                title={c.label}
+                style={{
+                  width:20, height:20, borderRadius:'50%', background:c.hex, cursor:'pointer',
+                  border: penColor===c.hex ? '3px solid #2d2a26' : '2px solid rgba(0,0,0,.2)',
+                  boxShadow: penColor===c.hex ? '0 0 0 2px rgba(255,255,255,.7)' : 'none',
+                  padding:0,
+                }}/>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function V3Toast({toast}){
   return <div className="qc-no-print" style={{
@@ -238,19 +297,19 @@ function V3({width=1100, height=1400}){
     toastTimer.current = setTimeout(()=>setToast(null), action ? 4000 : 1800);
   };
 
-  const addNote = (type) => {
+  const addNote = (type, size, penColor) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
     if(text.length > V3_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V3_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1), drawData:null}]);
+    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1), drawData:null, size:size||'M', penColor:penColor||'#2d2a26'}]);
     setInputs(i => ({...i, [type]:''}));
     showToast('질문이 떠올랐어요! 🎈');
   };
 
-  const addDrawNote = (type, canvasRef) => {
+  const addDrawNote = (type, canvasRef, size, penColor) => {
     if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
     const drawData = canvasRef.current.getDataURL();
-    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*8-4).toFixed(1), drawData}]);
+    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*8-4).toFixed(1), drawData, size:size||'M', penColor:penColor||'#2d2a26'}]);
     canvasRef.current.clear();
     showToast('질문이 떠올랐어요! 🎈');
   };
@@ -267,8 +326,8 @@ function V3({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
-  const updateNote = (id, {text, type, drawData}) => {
-    setNotes(n => n.map(x => x.id===id ? {...x, text, type, drawData: drawData !== undefined ? drawData : x.drawData} : x));
+  const updateNote = (id, patch) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, ...patch} : x));
     showToast('수정했어요 ✏️');
   };
 
@@ -392,8 +451,8 @@ function V3({width=1100, height=1400}){
           <V3Character key={t.key} type={t} idx={i}
             value={inputs[t.key]}
             onChange={v=>setInputs(s=>({...s,[t.key]:v}))}
-            onAdd={()=>addNote(t.key)}
-            onAddDraw={(ref)=>addDrawNote(t.key, ref)}
+            onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
+            onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
             focused={focused===t.key}
@@ -474,6 +533,8 @@ function V3({width=1100, height=1400}){
 function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur}){
   const [hover, setHover] = React.useState(false);
   const [inputMode, setInputMode] = React.useState('text');
+  const [noteSize, setNoteSize] = React.useState('M');
+  const [penColor, setPenColor] = React.useState('#2d2a26');
   const composing = React.useRef(false);
   const drawCanvasRef = React.useRef(null);
   const over = value.length > V3_MAX_CHARS;
@@ -529,6 +590,14 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
           ))}
         </div>
 
+        {/* 크기·색상 옵션 */}
+        <V3NoteOptions
+          size={noteSize} onSize={setNoteSize}
+          penColor={penColor} onPenColor={setPenColor}
+          typeColor={type.color}
+          showColor={inputMode==='draw'}
+        />
+
         {inputMode === 'text' ? (
           <>
             <div style={{position:'relative'}}>
@@ -536,7 +605,7 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
                 onFocus={onFocus} onBlur={onBlur}
                 onCompositionStart={()=>{ composing.current=true; }}
                 onCompositionEnd={()=>{ composing.current=false; }}
-                onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
+                onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(noteSize, penColor); } }}
                 placeholder={type.placeholder}
                 className="qc-no-print"
                 style={{
@@ -554,7 +623,7 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
                 background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'7px 8px',
                 fontSize:12, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26',
               }}>💡</button>
-              <button onClick={onAdd} style={{
+              <button onClick={()=>onAdd(noteSize, penColor)} style={{
                 flex:1, fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
                 color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
                 boxShadow:'2px 2px 0 #2d2a26', opacity: over ? 0.5 : 1,
@@ -564,10 +633,10 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
         ) : (
           <>
             <div className="qc-no-print">
-              <V3DrawCanvas ref={drawCanvasRef} bgColor="#fff" penColor={type.deep} />
+              <V3DrawCanvas ref={drawCanvasRef} bgColor="#fff" penColor={penColor} />
             </div>
             <div className="qc-no-print" style={{marginTop:8}}>
-              <button onClick={()=>onAddDraw(drawCanvasRef)} style={{
+              <button onClick={()=>onAddDraw(drawCanvasRef, noteSize, penColor)} style={{
                 width:'100%', fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
                 color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
                 boxShadow:'2px 2px 0 #2d2a26',
@@ -589,14 +658,18 @@ function V3Bubble({note, type, onDel, onUpdate}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
+  const [draftSize, setDraftSize] = React.useState(note.size||'M');
   const taRef = React.useRef(null);
   const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
   const isDrawNote = !!note.drawData;
 
+  const sz = V3_SIZES[note.size||'M'];
+
   const openEdit = () => {
     setDraft(note.text);
     setDraftType(note.type);
+    setDraftSize(note.size||'M');
     setEditing(true);
     if (!isDrawNote) setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
   };
@@ -605,10 +678,10 @@ function V3Bubble({note, type, onDel, onUpdate}){
       const newData = editDrawRef.current?.isDirty()
         ? editDrawRef.current.getDataURL()
         : note.drawData;
-      onUpdate({text:'', type:draftType, drawData:newData});
+      onUpdate({text:'', type:draftType, drawData:newData, size:draftSize});
     } else {
       const t = draft.trim();
-      if(t) onUpdate({text:t, type:draftType, drawData:null});
+      if(t) onUpdate({text:t, type:draftType, drawData:null, size:draftSize});
     }
     setEditing(false);
   };
@@ -634,6 +707,19 @@ function V3Bubble({note, type, onDel, onUpdate}){
               color: draftType===t.key ? '#fff' : t.deep,
               cursor:'pointer',
             }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
+        {/* 크기 선택 */}
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:26}}>크기</span>
+          {Object.entries(V3_SIZES).map(([k,v])=>(
+            <button key={k} onClick={()=>setDraftSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:30, height:24, borderRadius:999,
+              border:`2px solid ${curType?curType.color:'#888'}`,
+              background: draftSize===k ? (curType?curType.color:'#888') : '#fff',
+              color: draftSize===k ? '#fff' : (curType?curType.color:'#888'),
+              cursor:'pointer',
+            }}>{v.label}</button>
           ))}
         </div>
         {isDrawNote ? (
@@ -669,15 +755,16 @@ function V3Bubble({note, type, onDel, onUpdate}){
 
   return (
     <div style={{
-      position:'relative', width: isDrawNote ? 220 : 200,
+      position:'relative', width: isDrawNote ? sz.width : sz.width,
       animation:'v3bubblein .35s cubic-bezier(.3,1.4,.5,1)',
     }}>
       <div style={{
         background:'#fff', border:`3px solid ${type.color}`, borderRadius:'24px 24px 24px 4px',
-        padding:'12px 14px 14px', boxShadow:`0 4px 0 ${type.deep}`,
+        padding:'12px 14px 14px', minHeight: sz.minHeight, boxShadow:`0 4px 0 ${type.deep}`,
         transform:`rotate(${note.tilt}deg)`,
-        position:'relative', color:'#2d2a26',
-        fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize:18, lineHeight:1.35,
+        position:'relative',
+        color: note.penColor && !isDrawNote ? note.penColor : '#2d2a26',
+        fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize: sz.fontSize, lineHeight:1.35,
         wordBreak:'keep-all',
       }}>
         <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:8}}>
