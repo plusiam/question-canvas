@@ -472,10 +472,11 @@ function V2({width=1100, height=1400}){
 
           html, body {
             margin: 0 !important; padding: 0 !important;
-            background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
 
-          /* 최상위 컨테이너 */
+          /* 최상위 컨테이너: 높이 제한 없이 페이지 자유롭게 넘어감 */
           .v2-root {
             width: 100% !important;
             min-height: unset !important;
@@ -483,37 +484,34 @@ function V2({width=1100, height=1400}){
             background: #F4EBD9 !important;
           }
 
-          /* 그레인 오버레이 숨김 */
           .v2-grain { display: none !important; }
-
-          /* 입력 카드 4개(질문 만들기 틀) 숨김 */
           .v2-cards { display: none !important; }
-
-          /* 도화지 헤더(MY BOARD / 내 질문 도화지) */
           .v2-board-header { margin-bottom: 10px !important; }
 
-          /* 도화지 내부: flex → 다단, 포스트잇이 위→아래→다음단으로 흘러내림 */
+          /* 도화지: flex wrap 유지, 경계 없이 페이지를 넘어감 */
           .v2-board-inner {
-            display: block !important;
-            columns: 3 140px !important;
-            column-gap: 16px !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 14px !important;
+            align-content: flex-start !important;
             padding: 16px 14px !important;
             min-height: unset !important;
             box-shadow: none !important;
             border: 1.5px solid #3C2F2A !important;
             background: #FFF8ED !important;
+            /* 도화지 테두리가 2쪽으로 분리되지 않도록 */
+            break-inside: auto !important;
           }
 
-          /* 각 포스트잇: 페이지 경계에서 절대 잘리지 않음 */
+          /* 각 포스트잇: 내부에서 잘리지 않음, 크기 고정 */
           .v2-note-wrap {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
-            display: inline-block !important;
-            width: 100% !important;
-            margin: 0 0 14px 0 !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
           }
 
-          /* 포스트잇 내부: 인쇄 시 회전 제거 + 크기 고정 */
+          /* 포스트잇 내부: 회전 제거, 고정 높이로 균일한 크기 */
           .v2-note-inner {
             transform: none !important;
             box-shadow: 1px 2px 4px rgba(60,47,42,.15) !important;
@@ -522,9 +520,10 @@ function V2({width=1100, height=1400}){
             height: 130px !important;
             overflow: hidden !important;
           }
-          /* 손글씨(이미지) 포스트잇은 이미지 비율에 맞게 높이 자동 */
+          /* 손글씨 포스트잇: 이미지 비율 유지 */
           .v2-note-inner.is-draw {
             height: auto !important;
+            min-height: unset !important;
           }
         }
       `}</style>
