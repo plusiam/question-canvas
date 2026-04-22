@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>질문 카드 — 3가지 변형</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&family=Gaegu:wght@400;700&family=Gamja+Flower&display=swap" rel="stylesheet">
+<style>html,body{margin:0;padding:0;background:#f0eee9}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="v1-refined.jsx"></script>
+<script type="text/babel" src="v2-riso.jsx"></script>
+<script type="text/babel" src="v3-bubbles.jsx"></script>
+<script type="text/babel">
+const CARD_W = 1100;
+const CARD_H = 1400;
+
+function App(){
+  return (
+    <DesignCanvas>
+      <DCSection id="cards" title="질문 만들기 학습지 — 3가지 변형"
+        subtitle="완전한 인터랙티브 프로토타입 · 입력 → 붙이기 → 삭제 / 각 카드를 더블클릭하면 풀스크린으로 열려요">
+        <DCArtboard id="v1" label="V1 · 카툰 리파인 (원본 리파인)" width={CARD_W} height={CARD_H}>
+          <V1 width={CARD_W} height={CARD_H}/>
+        </DCArtboard>
+        <DCArtboard id="v2" label="V2 · 질문 공방 (리소/스크랩북)" width={CARD_W} height={CARD_H}>
+          <V2 width={CARD_W} height={CARD_H}/>
+        </DCArtboard>
+        <DCArtboard id="v3" label="V3 · 질문 풍선 놀이터 (캐릭터)" width={CARD_W} height={CARD_H}>
+          <V3 width={CARD_W} height={CARD_H}/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
