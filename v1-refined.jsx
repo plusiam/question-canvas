@@ -38,6 +38,104 @@ const V1_COLORS = [
   { hex:'#6B3FA0', label:'보라' },
 ];
 
+/* ── 텍스트 입력 모달 (v1) ── */
+function V1TextModal({ open, onClose, onConfirm, onExample, value, onChange, typeColor, type, noteSize, onSize }) {
+  const taRef = React.useRef(null);
+  const composing = React.useRef(false);
+  const over = value.length > V1_MAX_CHARS;
+
+  React.useEffect(() => {
+    if (open) setTimeout(() => { taRef.current?.focus(); }, 50);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleConfirm = () => {
+    if (!value.trim() || over) return;
+    onConfirm();
+  };
+
+  return (
+    <div className="qc-no-print" onClick={onClose} style={{
+      position:'fixed', inset:0, zIndex:1000,
+      background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center',
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:'#fff', borderRadius:20, border:`4px solid ${typeColor}`,
+        borderTop:`14px solid ${typeColor}`,
+        boxShadow:`0 8px 0 #2d2a26`, padding:'24px 28px',
+        display:'flex', flexDirection:'column', gap:14,
+        width:520, maxWidth:'95vw',
+      }}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+          <div style={{display:'flex', alignItems:'center', gap:10}}>
+            <div style={{
+              width:36, height:36, borderRadius:'50%', background:typeColor,
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:'#fff',
+              border:'2px solid #2d2a26',
+            }}>{type.icon}</div>
+            <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>{type.label}</span>
+          </div>
+          <button onClick={onClose} style={{
+            fontFamily:'Jua', fontSize:14, padding:'4px 14px', borderRadius:999,
+            border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
+          }}>닫기</button>
+        </div>
+        <p style={{fontFamily:'Gaegu', fontSize:18, color:'#7a7064', margin:0, lineHeight:1.4}}>
+          {type.hint[0]}<b style={{padding:'2px 8px', borderRadius:6, background:type.soft, color:'#2d2a26'}}>{type.hint[1]}</b>{type.hint[2]}
+        </p>
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:12, color:'#7a7064', minWidth:28}}>크기</span>
+          {Object.entries(V1_SIZES).map(([k,v]) => (
+            <button key={k} onClick={()=>onSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:32, height:26, borderRadius:6,
+              border:`1.5px solid ${typeColor}`,
+              background: noteSize===k ? typeColor : '#fff',
+              color: noteSize===k ? '#fff' : typeColor, cursor:'pointer',
+            }}>{v.label}</button>
+          ))}
+        </div>
+        <div style={{position:'relative'}}>
+          <textarea ref={taRef} value={value} onChange={e=>onChange(e.target.value)}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();handleConfirm();} }}
+            placeholder={type.placeholder}
+            style={{
+              fontFamily:'Gaegu', fontSize:22, border:`2px solid ${over?'#D63384':'#e5ddc6'}`, borderRadius:12,
+              padding:'14px 16px', resize:'none', outline:'none', width:'100%', minHeight:120,
+              background: over?'#fff0f6':'#fffcf4', boxSizing:'border-box', lineHeight:1.6,
+            }}/>
+          <span style={{
+            position:'absolute', bottom:8, right:10, fontFamily:'Noto Sans KR', fontSize:11,
+            color: over?'#D63384':'#aaa', fontWeight: over?700:400,
+          }}>{value.length}/{V1_MAX_CHARS}</span>
+        </div>
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={onExample} style={{
+            background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'10px 14px',
+            fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
+            whiteSpace:'nowrap',
+          }}>힌트 💡</button>
+          <button onClick={handleConfirm} style={{
+            flex:1, fontFamily:'Jua', padding:'12px 14px', border:'none', borderRadius:10,
+            color:'#fff', cursor:'pointer', fontSize:17, background:typeColor,
+            opacity: !value.trim()||over ? 0.5 : 1,
+            boxShadow:`0 4px 0 #2d2a26`,
+          }}>+ 도화지에 붙이기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── 손글씨 모달 (v1) ── */
 function V1DrawModal({ open, onClose, onConfirm, bgColor, penColor, typeColor, type }) {
   const canvasRef = React.useRef(null);
@@ -664,7 +762,7 @@ function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count})
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#2d2a26');
   const [drawModalOpen, setDrawModalOpen] = React.useState(false);
-  const modalCanvasRef = React.useRef(null);
+  const [textModalOpen, setTextModalOpen] = React.useState(false);
   const composing = React.useRef(false);
   const taRef = React.useRef(null);
   const drawCanvasRef = React.useRef(null);
@@ -730,46 +828,48 @@ function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count})
         showColor={false}
       />
 
-      <div className="qc-no-print" style={{position:'relative'}}>
-        <textarea ref={taRef} value={value} onChange={e=>handleChange(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(noteSize, penColor); } }}
-          placeholder={type.placeholder}
-          style={{
-            fontFamily:'Gaegu', fontSize:20, border:`2px solid ${over ? '#D63384' : '#e5ddc6'}`, borderRadius:10,
-            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:66,
-            background: over ? '#fff0f6' : '#fffcf4', boxSizing:'border-box',
-          }} />
-        <span style={{
-          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
-          color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
-        }}>{value.length}/{V1_MAX_CHARS}</span>
+      {/* 텍스트 입력 미리보기 — 클릭하면 모달 오픈 */}
+      <div className="qc-no-print" onClick={()=>setTextModalOpen(true)} style={{
+        fontFamily:'Gaegu', fontSize:18, border:`2px solid ${over?'#D63384':'#e5ddc6'}`, borderRadius:10,
+        padding:'10px 12px', minHeight:50, background: over?'#fff0f6':'#fffcf4', boxSizing:'border-box',
+        color: value ? '#2d2a26' : '#bbb', cursor:'text', lineHeight:1.5, position:'relative',
+      }}>
+        {value || type.placeholder}
+        {value && <span style={{
+          position:'absolute', bottom:5, right:8, fontFamily:'Noto Sans KR', fontSize:10,
+          color: over?'#D63384':'#aaa', fontWeight: over?700:400,
+        }}>{value.length}/{V1_MAX_CHARS}</span>}
       </div>
-      <div className="qc-no-print" style={{display:'flex', gap:8, flexDirection:'column'}}>
-        {exampleUsed && (
-          <p style={{
-            fontFamily:'Noto Sans KR', fontSize:12, color:type.color, margin:0,
-            padding:'4px 8px', background:type.paper, borderRadius:6, fontWeight:500,
-          }}>✏️ 예시예요! 내 말로 바꿔서 써봐요</p>
-        )}
-        <div style={{display:'flex', gap:8}}>
-          <button onClick={handleExample} style={{
-            background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
-            fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
-            whiteSpace:'nowrap',
-          }}>힌트 💡</button>
-          <button onClick={()=>onAdd(noteSize, penColor)} style={{
-            flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
-            color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
-            opacity: over ? 0.5 : 1,
-          }}>+ 도화지에 붙이기</button>
-          <button onClick={()=>setDrawModalOpen(true)} style={{
-            fontFamily:'Jua', fontSize:14, padding:'8px 12px', border:`2px solid ${type.color}`,
-            borderRadius:10, color:type.color, background:'#fff', cursor:'pointer', whiteSpace:'nowrap',
-          }}>✏️ 손으로</button>
-        </div>
+
+      <div className="qc-no-print" style={{display:'flex', gap:8}}>
+        <button onClick={handleExample} style={{
+          background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
+          fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
+          whiteSpace:'nowrap',
+        }}>힌트 💡</button>
+        <button onClick={()=>onAdd(noteSize, penColor)} style={{
+          flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
+          color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
+          opacity: over||!value.trim() ? 0.5 : 1,
+        }}>+ 도화지에 붙이기</button>
+        <button onClick={()=>setDrawModalOpen(true)} style={{
+          fontFamily:'Jua', fontSize:14, padding:'8px 12px', border:`2px solid ${type.color}`,
+          borderRadius:10, color:type.color, background:'#fff', cursor:'pointer', whiteSpace:'nowrap',
+        }}>✏️ 손으로</button>
       </div>
+
+      <V1TextModal
+        open={textModalOpen}
+        onClose={()=>setTextModalOpen(false)}
+        onConfirm={()=>{ onAdd(noteSize, penColor); setTextModalOpen(false); }}
+        onExample={()=>{ onExample(); setExampleUsed(true); }}
+        value={value}
+        onChange={handleChange}
+        typeColor={type.color}
+        type={type}
+        noteSize={noteSize}
+        onSize={setNoteSize}
+      />
 
       <V1DrawModal
         open={drawModalOpen}

@@ -77,6 +77,103 @@ const V2Tape = ({color='#FFE8A3', rotate=-4, width=80, top=-10, left=20, pattern
   }} />
 );
 
+/* ── 텍스트 입력 모달 (v2) ── */
+function V2TextModal({ open, onClose, onConfirm, onExample, value, onChange, typeColor, type, noteSize, onSize }) {
+  const taRef = React.useRef(null);
+  const composing = React.useRef(false);
+  const over = value.length > V2_MAX_CHARS;
+
+  React.useEffect(() => {
+    if (open) setTimeout(() => { taRef.current?.focus(); }, 50);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleConfirm = () => {
+    if (!value.trim() || over) return;
+    onConfirm();
+  };
+
+  return (
+    <div className="qc-no-print" onClick={onClose} style={{
+      position:'fixed', inset:0, zIndex:1000,
+      background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center',
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:'#FFF8ED', border:`2px solid #3C2F2A`,
+        boxShadow:'6px 6px 0 #3C2F2A', padding:'24px 28px',
+        display:'flex', flexDirection:'column', gap:14,
+        width:520, maxWidth:'95vw', position:'relative',
+      }}>
+        <V2Tape color={type.wash} rotate={-2} width={110} top={-11} left={40}/>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+          <div style={{display:'flex', alignItems:'center', gap:12}}>
+            <div style={{width:48, height:48, background:'#FFF8ED', border:`2px solid ${typeColor}`,
+              display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <V2Icon type={type} size={30}/>
+            </div>
+            <div>
+              <div style={{fontFamily:'Jua', fontSize:11, letterSpacing:3, color:typeColor}}>{type.sub}</div>
+              <div style={{fontFamily:'Jua', fontSize:22, color:'#3C2F2A', lineHeight:1}}>{type.label}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            fontFamily:'Jua', fontSize:13, padding:'4px 14px',
+            border:'1.5px solid #3C2F2A', background:'transparent', color:'#3C2F2A', cursor:'pointer',
+          }}>닫기</button>
+        </div>
+        <div style={{fontFamily:'Gaegu', fontSize:18, color:'#6B5445',
+          padding:'4px 0', borderBottom:`2px dashed ${typeColor}`}}>" {type.hint} "</div>
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:11, color:'#6B5445', minWidth:28}}>크기</span>
+          {Object.entries(V2_SIZES).map(([k,v]) => (
+            <button key={k} onClick={()=>onSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:30, height:24,
+              border:`1.5px solid ${typeColor}`,
+              background: noteSize===k ? typeColor : 'transparent',
+              color: noteSize===k ? '#fff' : typeColor, cursor:'pointer',
+            }}>{v.label}</button>
+          ))}
+        </div>
+        <div style={{position:'relative'}}>
+          <textarea ref={taRef} value={value} onChange={e=>onChange(e.target.value)}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();handleConfirm();} }}
+            placeholder={type.placeholder}
+            style={{
+              fontFamily:'Gaegu', fontSize:22, border:`1.5px solid ${over?'#D63384':typeColor}`,
+              padding:'14px 16px', resize:'none', outline:'none', width:'100%', minHeight:120,
+              background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box', color:'#3C2F2A', lineHeight:1.6,
+            }}/>
+          <span style={{
+            position:'absolute', bottom:8, right:10, fontFamily:'Noto Sans KR', fontSize:11,
+            color: over?'#D63384':'#aaa', fontWeight: over?700:400,
+          }}>{value.length}/{V2_MAX_CHARS}</span>
+        </div>
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={onExample} style={{
+            background:'transparent', border:`1.5px solid ${typeColor}`, padding:'10px 14px',
+            fontSize:13, cursor:'pointer', color:typeColor, fontFamily:'Jua', whiteSpace:'nowrap',
+          }}>힌트 💡</button>
+          <button onClick={handleConfirm} style={{
+            flex:1, fontFamily:'Jua', padding:'12px 14px', border:'none',
+            color:'#FFF6E1', cursor:'pointer', fontSize:17, background:typeColor,
+            boxShadow:`3px 3px 0 #3C2F2A`, opacity: !value.trim()||over ? 0.5 : 1,
+          }}>✂️ 오려서 붙이기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── 손글씨 모달 (v2) ── */
 function V2DrawModal({ open, onClose, onConfirm, bgColor, penColor, typeColor, type }) {
   const canvasRef = React.useRef(null);
@@ -704,6 +801,7 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#3C2F2A');
   const [drawModalOpen, setDrawModalOpen] = React.useState(false);
+  const [textModalOpen, setTextModalOpen] = React.useState(false);
   const composing = React.useRef(false);
   const drawCanvasRef = React.useRef(null);
   const over = value.length > V2_MAX_CHARS;
@@ -752,22 +850,17 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
         showColor={false}
       />
 
-      <div style={{position:'relative'}}>
-        <textarea value={value} onChange={e=>onChange(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault(); onAdd(noteSize, penColor);} }}
-          placeholder={type.placeholder}
-          className="qc-no-print"
-          style={{
-            fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over?'#D63384':type.color}`,
-            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
-            background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
-          }}/>
-        <span className="qc-no-print" style={{
-          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
+      {/* 텍스트 미리보기 — 클릭하면 모달 오픈 */}
+      <div className="qc-no-print" onClick={()=>setTextModalOpen(true)} style={{
+        fontFamily:'Gaegu', fontSize:18, border:`1.5px solid ${over?'#D63384':type.color}`,
+        padding:'10px 12px', minHeight:50, background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box',
+        color: value?'#3C2F2A':'#bbb', cursor:'text', lineHeight:1.5, position:'relative',
+      }}>
+        {value || type.placeholder}
+        {value && <span style={{
+          position:'absolute', bottom:5, right:8, fontFamily:'Noto Sans KR', fontSize:10,
           color: over?'#D63384':'#aaa', fontWeight: over?700:400,
-        }}>{value.length}/{V2_MAX_CHARS}</span>
+        }}>{value.length}/{V2_MAX_CHARS}</span>}
       </div>
       <div className="qc-no-print" style={{display:'flex', gap:8}}>
         <button onClick={onExample} style={{
@@ -777,13 +870,26 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
         <button onClick={()=>onAdd(noteSize, penColor)} style={{
           flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
           color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
-          boxShadow:`2px 2px 0 #3C2F2A`, opacity: over?0.5:1,
+          boxShadow:`2px 2px 0 #3C2F2A`, opacity: over||!value.trim()?0.5:1,
         }}>✂️ 오려서 붙이기</button>
         <button onClick={()=>setDrawModalOpen(true)} style={{
           fontFamily:'Jua', fontSize:13, padding:'9px 12px', border:`1.5px solid ${type.color}`,
           color:type.color, background:'transparent', cursor:'pointer', whiteSpace:'nowrap',
         }}>✏️ 손으로</button>
       </div>
+
+      <V2TextModal
+        open={textModalOpen}
+        onClose={()=>setTextModalOpen(false)}
+        onConfirm={()=>{ onAdd(noteSize, penColor); setTextModalOpen(false); }}
+        onExample={onExample}
+        value={value}
+        onChange={onChange}
+        typeColor={type.color}
+        type={type}
+        noteSize={noteSize}
+        onSize={setNoteSize}
+      />
 
       <V2DrawModal
         open={drawModalOpen}
