@@ -488,42 +488,45 @@ function V2({width=1100, height=1400}){
           .v2-cards { display: none !important; }
           .v2-board-header { margin-bottom: 10px !important; }
 
-          /* 도화지: flex wrap 유지, 경계 없이 페이지를 넘어감 */
+          /* 도화지: flex wrap, 페이지 자유롭게 넘어감 */
           .v2-board-inner {
             display: flex !important;
             flex-wrap: wrap !important;
-            gap: 14px !important;
+            gap: 4mm !important;
             align-content: flex-start !important;
-            padding: 16px 14px !important;
+            padding: 3mm 3mm !important;
             min-height: unset !important;
             box-shadow: none !important;
             border: 1.5px solid #3C2F2A !important;
             background: #FFF8ED !important;
-            /* 도화지 테두리가 2쪽으로 분리되지 않도록 */
             break-inside: auto !important;
           }
 
-          /* 각 포스트잇: 내부에서 잘리지 않음, 크기 고정 */
+          /* 각 포스트잇 wrapper: 잘리지 않음, 3열 고정 너비 */
           .v2-note-wrap {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             flex-shrink: 0 !important;
             margin: 0 !important;
+            width: calc((100% - 8mm) / 3) !important;
           }
 
-          /* 포스트잇 내부: 회전 제거, 고정 높이로 균일한 크기 */
+          /* 포스트잇 내부: 회전 제거, mm 단위 고정 높이 */
           .v2-note-inner {
             transform: none !important;
             box-shadow: 1px 2px 4px rgba(60,47,42,.15) !important;
             clip-path: none !important;
-            min-height: 130px !important;
-            height: 130px !important;
+            width: 100% !important;
+            min-height: 60mm !important;
+            height: 60mm !important;
             overflow: hidden !important;
+            padding: 8px 10px 8px !important;
+            box-sizing: border-box !important;
           }
           /* 손글씨 포스트잇: 이미지 비율 유지 */
           .v2-note-inner.is-draw {
             height: auto !important;
-            min-height: unset !important;
+            min-height: 40mm !important;
           }
         }
       `}</style>
