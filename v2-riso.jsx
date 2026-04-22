@@ -77,8 +77,54 @@ const V2Tape = ({color='#FFE8A3', rotate=-4, width=80, top=-10, left=20, pattern
   }} />
 );
 
+/* ── 손글씨 모달 (v2) ── */
+function V2DrawModal({ open, onClose, onConfirm, bgColor, penColor, typeColor, type }) {
+  const canvasRef = React.useRef(null);
+  const [pc, setPc] = React.useState(penColor);
+  if (!open) return null;
+  const handleConfirm = () => {
+    if (!canvasRef.current?.isDirty()) return;
+    onConfirm(canvasRef);
+  };
+  return (
+    <div className="qc-no-print" onClick={onClose} style={{
+      position:'fixed', inset:0, zIndex:1000,
+      background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center',
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:'#FFF8ED', border:`2px solid #3C2F2A`,
+        boxShadow:'6px 6px 0 #3C2F2A', padding:'24px 28px',
+        display:'flex', flexDirection:'column', gap:14, maxWidth:'95vw',
+      }}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:20}}>
+          <span style={{fontFamily:'Jua', fontSize:20, color:typeColor}}>✏️ {type.label} 손글씨</span>
+          <button onClick={onClose} style={{
+            fontFamily:'Jua', fontSize:13, padding:'4px 14px',
+            border:'1.5px solid #3C2F2A', background:'transparent', color:'#3C2F2A', cursor:'pointer',
+          }}>닫기</button>
+        </div>
+        <V2DrawCanvas ref={canvasRef} bgColor={bgColor} penColor={pc} large />
+        <div style={{display:'flex', alignItems:'center', gap:6, flexWrap:'wrap'}}>
+          {V2_COLORS.map(c => (
+            <button key={c.hex} onClick={()=>setPc(c.hex)} title={c.label} style={{
+              width:24, height:24, borderRadius:'50%', background:c.hex, cursor:'pointer',
+              border: pc===c.hex ? '3px solid #3C2F2A' : '1.5px solid rgba(0,0,0,.15)',
+              boxShadow: pc===c.hex ? '0 0 0 2px #FFF8ED' : 'none', padding:0,
+            }}/>
+          ))}
+        </div>
+        <button onClick={handleConfirm} style={{
+          fontFamily:'Jua', fontSize:18, padding:'12px 0', border:'none',
+          color:'#FFF6E1', cursor:'pointer', background:typeColor,
+          boxShadow:'3px 3px 0 #3C2F2A',
+        }}>✂️ 오려서 붙이기</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── DrawCanvas (v2 스타일) ── */
-const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED', penColor='#3C2F2A', initialDataURL=null }, ref) {
+const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED', penColor='#3C2F2A', initialDataURL=null, large=false }, ref) {
   const canvasEl = React.useRef(null);
   const isDrawing = React.useRef(false);
   const isDirtyRef = React.useRef(false);
@@ -87,20 +133,23 @@ const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED',
 
   React.useEffect(() => { penColorRef.current = penColor; }, [penColor]);
 
+  const W = large ? 480 : 280;
+  const H = large ? 300 : 160;
+
   React.useEffect(() => {
     const canvas = canvasEl.current;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = 280 * dpr;
-    canvas.height = 160 * dpr;
-    canvas.style.width = '280px';
-    canvas.style.height = '160px';
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, 280, 160);
+    ctx.fillRect(0, 0, W, H);
     if (initialDataURL) {
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, 280, 160);
+      img.onload = () => ctx.drawImage(img, 0, 0, W, H);
       img.src = initialDataURL;
     }
   }, []);
@@ -111,7 +160,7 @@ const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED',
     clear: () => {
       const ctx = canvasEl.current.getContext('2d');
       ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, 280, 160);
+      ctx.fillRect(0, 0, W, H);
       isDirtyRef.current = false;
     },
   }));
@@ -652,9 +701,9 @@ function V2NoteOptions({ size, onSize, penColor, onPenColor, typeColor, showColo
 
 function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, idx}){
   const [h, setH] = React.useState(false);
-  const [inputMode, setInputMode] = React.useState('text');
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#3C2F2A');
+  const [drawModalOpen, setDrawModalOpen] = React.useState(false);
   const composing = React.useRef(false);
   const drawCanvasRef = React.useRef(null);
   const over = value.length > V2_MAX_CHARS;
@@ -695,71 +744,56 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
       <div style={{fontFamily:'Gaegu', fontSize:20, color:'#6B5445',
         padding:'6px 0', borderBottom:`2px dashed ${type.color}`}}>" {type.hint} "</div>
 
-      {/* 입력 모드 탭 */}
-      <div className="qc-no-print" style={{display:'flex', gap:0, borderBottom:`1.5px solid ${type.color}`}}>
-        {[{id:'text', label:'⌨️ 타자로'}, {id:'draw', label:'✏️ 손으로'}].map(m => (
-          <button key={m.id} onClick={()=>setInputMode(m.id)} style={{
-            fontFamily:'Jua', fontSize:13, padding:'5px 14px', border:'none', cursor:'pointer',
-            background: inputMode===m.id ? type.color : 'transparent',
-            color: inputMode===m.id ? '#fff' : type.color,
-            borderRadius:'4px 4px 0 0',
-          }}>{m.label}</button>
-        ))}
-      </div>
-
-      {/* 크기·색상 옵션 (공통) */}
+      {/* 크기 옵션 */}
       <V2NoteOptions
         size={noteSize} onSize={setNoteSize}
         penColor={penColor} onPenColor={setPenColor}
         typeColor={type.color}
-        showColor={inputMode==='draw'}
+        showColor={false}
       />
 
-      {inputMode === 'text' ? (
-        <>
-          <div style={{position:'relative'}}>
-            <textarea value={value} onChange={e=>onChange(e.target.value)}
-              onCompositionStart={()=>{ composing.current=true; }}
-              onCompositionEnd={()=>{ composing.current=false; }}
-              onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault(); onAdd(noteSize, penColor);} }}
-              placeholder={type.placeholder}
-              className="qc-no-print"
-              style={{
-                fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over?'#D63384':type.color}`,
-                padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
-                background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
-              }}/>
-            <span className="qc-no-print" style={{
-              position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
-              color: over?'#D63384':'#aaa', fontWeight: over?700:400,
-            }}>{value.length}/{V2_MAX_CHARS}</span>
-          </div>
-          <div className="qc-no-print" style={{display:'flex', gap:8}}>
-            <button onClick={onExample} style={{
-              background:'transparent', border:`1.5px solid ${type.color}`, padding:'9px 14px',
-              fontSize:13, cursor:'pointer', color:type.color, fontFamily:'Jua',
-            }}>힌트 💡</button>
-            <button onClick={()=>onAdd(noteSize, penColor)} style={{
-              flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
-              color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
-              boxShadow:`2px 2px 0 #3C2F2A`, opacity: over?0.5:1,
-            }}>✂️ 오려서 붙이기</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="qc-no-print">
-            <V2DrawCanvas ref={drawCanvasRef} bgColor={type.paper} penColor={penColor} />
-          </div>
-          <div className="qc-no-print">
-            <button onClick={()=>onAddDraw(drawCanvasRef, noteSize, penColor)} style={{
-              width:'100%', fontFamily:'Jua', padding:'10px 14px', border:'none',
-              color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
-              boxShadow:`2px 2px 0 #3C2F2A`,
-            }}>✂️ 오려서 붙이기</button>
-          </div>
-        </>
-      )}
+      <div style={{position:'relative'}}>
+        <textarea value={value} onChange={e=>onChange(e.target.value)}
+          onCompositionStart={()=>{ composing.current=true; }}
+          onCompositionEnd={()=>{ composing.current=false; }}
+          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault(); onAdd(noteSize, penColor);} }}
+          placeholder={type.placeholder}
+          className="qc-no-print"
+          style={{
+            fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over?'#D63384':type.color}`,
+            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
+            background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
+          }}/>
+        <span className="qc-no-print" style={{
+          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
+          color: over?'#D63384':'#aaa', fontWeight: over?700:400,
+        }}>{value.length}/{V2_MAX_CHARS}</span>
+      </div>
+      <div className="qc-no-print" style={{display:'flex', gap:8}}>
+        <button onClick={onExample} style={{
+          background:'transparent', border:`1.5px solid ${type.color}`, padding:'9px 14px',
+          fontSize:13, cursor:'pointer', color:type.color, fontFamily:'Jua',
+        }}>힌트 💡</button>
+        <button onClick={()=>onAdd(noteSize, penColor)} style={{
+          flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
+          color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
+          boxShadow:`2px 2px 0 #3C2F2A`, opacity: over?0.5:1,
+        }}>✂️ 오려서 붙이기</button>
+        <button onClick={()=>setDrawModalOpen(true)} style={{
+          fontFamily:'Jua', fontSize:13, padding:'9px 12px', border:`1.5px solid ${type.color}`,
+          color:type.color, background:'transparent', cursor:'pointer', whiteSpace:'nowrap',
+        }}>✏️ 손으로</button>
+      </div>
+
+      <V2DrawModal
+        open={drawModalOpen}
+        onClose={()=>setDrawModalOpen(false)}
+        onConfirm={(ref)=>{ onAddDraw(ref, noteSize, penColor); setDrawModalOpen(false); }}
+        bgColor={type.paper}
+        penColor={penColor}
+        typeColor={type.color}
+        type={type}
+      />
     </div>
   );
 }
