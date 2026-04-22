@@ -239,7 +239,7 @@ function V1({width=1100, height=1400}){
       </div>
 
       {/* Question-type cards — 2x2 grid */}
-      <div className="v1-type-grid" style={{marginTop:28, display:'grid', gridTemplateColumns:'1fr 1fr', gap:18}}>
+      <div className="v1-type-grid qc-no-print" style={{marginTop:28, display:'grid', gridTemplateColumns:'1fr 1fr', gap:18}}>
         {V1_TYPES.map(t => (
           <V1TypeCard key={t.key} type={t}
             value={inputs[t.key]}
@@ -253,7 +253,7 @@ function V1({width=1100, height=1400}){
 
       {/* Board */}
       <div style={{marginTop:34}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:12}}>
+        <div className="v1-board-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:12}}>
           <h2 style={{fontFamily:'Jua', fontSize:28, margin:0, display:'flex', alignItems:'center', gap:10}}>
             <span style={{fontSize:30}}>🎨</span> 내 질문 도화지
           </h2>
@@ -296,7 +296,7 @@ function V1({width=1100, height=1400}){
         <V1Btn bg="#ffd7d4" onClick={clearAll}>🗑️ 모두 지우기</V1Btn>
       </div>
 
-      <div style={{textAlign:'center', marginTop:30, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
+      <div className="v1-copyright" style={{textAlign:'center', marginTop:30, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 룰루랄라 한기쌤 · 질문 만들기 학습지
       </div>
 
@@ -319,31 +319,81 @@ function V1({width=1100, height=1400}){
         }
 
         @media print{
+          @page{margin:10mm 10mm;size:A4 portrait}
           .qc-no-print{display:none !important}
-          html,body{margin:0;padding:0;background:#fff}
+          html,body{margin:0 !important;padding:0 !important;background:#fff !important;
+            -webkit-print-color-adjust:exact;print-color-adjust:exact}
           #root{padding:0}
+
           .v1-root{
-            width:794px !important;
-            max-width:794px !important;
-            min-height:auto !important;
-            padding:20px 28px 32px !important;
+            width:100% !important;
+            max-width:100% !important;
+            min-height:unset !important;
+            padding:4mm 4mm !important;
+            background:#FFF6E1 !important;
             box-sizing:border-box !important;
           }
-          .v1-board{
-            min-height:auto !important;
-            background-image:none !important;
-            border:2px dashed #aaa !important;
+
+          /* 헤더 압축 */
+          .v1-header{
+            padding:8px 16px 10px !important;
             box-shadow:none !important;
-            page-break-inside:avoid;
+            border:1px solid #c8bfb0 !important;
+            border-radius:14px !important;
           }
-          .v1-note{
-            transform:none !important;
-            box-shadow:1px 2px 4px rgba(0,0,0,.1) !important;
-            page-break-inside:avoid;
+          .v1-header h1{font-size:22px !important;margin:0 !important}
+          .v1-header p{font-size:12px !important;margin:2px 0 6px !important}
+
+          /* 이야기 영역 압축 */
+          .v1-story{
+            margin-top:4px !important;
+            padding:8px 14px !important;
+            box-shadow:none !important;
+            border-radius:12px !important;
           }
-          .v1-header{box-shadow:none !important}
+
+          /* 입력 카드 숨김 */
           .v1-type-grid{display:none !important}
-          .v1-story{box-shadow:none !important}
+
+          /* copyright 숨김 */
+          .v1-copyright{display:none !important}
+
+          /* 보드 헤더 */
+          .v1-board-header{margin-top:6px !important;margin-bottom:4px !important}
+          .v1-board-header h2{font-size:18px !important;margin:0 !important}
+
+          /* 도화지: flex wrap, 3열, 페이지 자유롭게 넘어감 */
+          .v1-board{
+            display:flex !important;
+            flex-wrap:wrap !important;
+            gap:3mm !important;
+            align-content:flex-start !important;
+            padding:3mm !important;
+            min-height:unset !important;
+            background:#fffdf4 !important;
+            background-image:none !important;
+            border:1.5px solid #2d2a26 !important;
+            border-radius:12px !important;
+            box-shadow:none !important;
+            break-inside:auto !important;
+          }
+
+          /* 포스트잇 wrapper: 3열 */
+          .v1-note{
+            break-inside:avoid !important;
+            page-break-inside:avoid !important;
+            flex-shrink:0 !important;
+            width:calc((100% - 6mm) / 3) !important;
+            height:52mm !important;
+            min-height:52mm !important;
+            transform:none !important;
+            box-shadow:1px 2px 3px rgba(0,0,0,.1) !important;
+            border-radius:8px !important;
+            overflow:hidden !important;
+            padding:6px 8px 6px !important;
+            box-sizing:border-box !important;
+            font-size:14px !important;
+          }
         }
       `}</style>
     </div>

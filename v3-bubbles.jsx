@@ -375,7 +375,7 @@ function V3({width=1100, height=1400}){
   const allFour = V3_TYPES.every(t => counts[t.key] >= 1);
 
   return (
-    <div style={{
+    <div className="v3-root" style={{
       width, minHeight:height, position:'relative',
       fontFamily:"'Noto Sans KR', sans-serif", color:'#2d2a26',
       background: 'linear-gradient(180deg, #C7E9FF 0%, #FFF3D0 55%, #FFDDE9 100%)',
@@ -386,7 +386,7 @@ function V3({width=1100, height=1400}){
       <div style={{position:'absolute', bottom:180, right:60, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,.4)'}}/>
 
       {/* Header */}
-      <div style={{position:'relative', zIndex:2, textAlign:'center', marginBottom:18}}>
+      <div className="v3-header" style={{position:'relative', zIndex:2, textAlign:'center', marginBottom:18}}>
         <a href="index.html" className="qc-no-print" style={{
           display:'inline-flex', alignItems:'center', gap:5,
           fontFamily:'Jua', fontSize:13, color:'#555', textDecoration:'none',
@@ -418,7 +418,7 @@ function V3({width=1100, height=1400}){
       </div>
 
       {/* Name + story row */}
-      <div style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 2fr', gap:16, marginTop:10, marginBottom:24}}>
+      <div className="v3-name-story" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 2fr', gap:16, marginTop:10, marginBottom:24}}>
         <div style={{background:'#fff', border:'3px solid #2d2a26', borderRadius:22, padding:'14px 18px',
           boxShadow:'4px 4px 0 #2d2a26'}}>
           <div style={{fontFamily:'Jua', fontSize:14, color:'#7a7064', marginBottom:6}}>👤 나는</div>
@@ -446,7 +446,7 @@ function V3({width=1100, height=1400}){
       </div>
 
       {/* The 4 character bubbles */}
-      <div style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14}}>
+      <div className="qc-no-print" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14}}>
         {V3_TYPES.map((t,i) => (
           <V3Character key={t.key} type={t} idx={i}
             value={inputs[t.key]}
@@ -464,7 +464,7 @@ function V3({width=1100, height=1400}){
 
       {/* Sky board */}
       <div style={{position:'relative', zIndex:2, marginTop:34}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:12}}>
+        <div className="v3-board-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:12}}>
           <h2 style={{fontFamily:'Jua', fontSize:28, margin:0, display:'flex', alignItems:'center', gap:10}}>
             <span style={{fontSize:30}}>☁️</span> 질문이 떠다니는 하늘
           </h2>
@@ -487,7 +487,7 @@ function V3({width=1100, height=1400}){
           </div>
         </div>
 
-        <div style={{
+        <div className="v3-board-inner" style={{
           position:'relative', background:'linear-gradient(180deg, #E8F5FF 0%, #FFF8E8 100%)',
           border:'3px solid #2d2a26', borderRadius:24, padding:'28px 22px', minHeight:300,
           boxShadow:'0 6px 0 #2d2a26',
@@ -514,7 +514,7 @@ function V3({width=1100, height=1400}){
         <V3Btn bg="#B8F2C8" onClick={()=>window.print()}>🖨️ 인쇄</V3Btn>
         <V3Btn bg="#FFD4D4" onClick={clearAll}>🗑️ 모두 지우기</V3Btn>
       </div>
-      <div style={{position:'relative', zIndex:2, textAlign:'center', marginTop:24, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
+      <div className="v3-copyright" style={{position:'relative', zIndex:2, textAlign:'center', marginTop:24, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 질문 풍선 놀이터 · 룰루랄라 한기쌤
       </div>
 
@@ -524,7 +524,94 @@ function V3({width=1100, height=1400}){
         @keyframes v3pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
         @keyframes v3float{0%,100%{transform:translateY(0) rotate(var(--t,0deg))}50%{transform:translateY(-4px) rotate(var(--t,0deg))}}
         @keyframes v3bubblein{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
-        @media print{.qc-no-print{display:none !important}}
+        @media print{
+          @page{margin:10mm 10mm;size:A4 portrait}
+          .qc-no-print{display:none !important}
+          html,body{margin:0 !important;padding:0 !important;background:#fff !important;
+            -webkit-print-color-adjust:exact;print-color-adjust:exact}
+          #root{padding:0}
+
+          .v3-root{
+            width:100% !important;
+            max-width:100% !important;
+            min-height:unset !important;
+            padding:4mm 4mm !important;
+            background:linear-gradient(180deg,#C7E9FF 0%,#FFF3D0 55%,#FFDDE9 100%) !important;
+            box-sizing:border-box !important;
+            overflow:visible !important;
+          }
+
+          .v3-header{
+            margin-bottom:6px !important;
+          }
+          .v3-header>div{
+            padding:8px 20px 10px !important;
+            box-shadow:none !important;
+            border:2px solid #2d2a26 !important;
+          }
+          .v3-header h1{font-size:20px !important;margin:0 !important}
+          .v3-header p{font-size:11px !important;margin:2px 0 0 !important}
+          .v3-header div[style*="borderTop"]{display:none !important}
+
+          .v3-name-story{
+            margin-top:4px !important;
+            margin-bottom:10px !important;
+            gap:8px !important;
+          }
+          .v3-name-story>div{
+            padding:8px 12px !important;
+            box-shadow:none !important;
+            border:1.5px solid #2d2a26 !important;
+          }
+
+          .v3-board-header{
+            margin-top:6px !important;
+            margin-bottom:4px !important;
+          }
+          .v3-board-header h2{font-size:18px !important;margin:0 !important}
+
+          .v3-board-inner{
+            display:flex !important;
+            flex-wrap:wrap !important;
+            gap:3mm !important;
+            align-content:flex-start !important;
+            padding:3mm !important;
+            min-height:unset !important;
+            background:#EDF8FF !important;
+            background-image:none !important;
+            border:2px solid #2d2a26 !important;
+            border-radius:16px !important;
+            box-shadow:none !important;
+            break-inside:auto !important;
+            overflow:visible !important;
+          }
+
+          .v3-bubble{
+            break-inside:avoid !important;
+            page-break-inside:avoid !important;
+            flex-shrink:0 !important;
+            width:calc((100% - 6mm) / 3) !important;
+            animation:none !important;
+          }
+          .v3-bubble>div{
+            transform:none !important;
+            box-shadow:1px 2px 3px rgba(0,0,0,.1) !important;
+            height:52mm !important;
+            min-height:52mm !important;
+            overflow:hidden !important;
+            padding:6px 8px !important;
+            box-sizing:border-box !important;
+            width:100% !important;
+          }
+          .v3-bubble img{
+            max-height:36mm !important;
+            height:auto !important;
+            width:100% !important;
+            object-fit:contain !important;
+          }
+
+          .v3-copyright{display:none !important}
+        }
       `}</style>
     </div>
   );
@@ -754,7 +841,7 @@ function V3Bubble({note, type, onDel, onUpdate}){
   }
 
   return (
-    <div style={{
+    <div className="v3-bubble" style={{
       position:'relative', width: isDrawNote ? sz.width : sz.width,
       animation:'v3bubblein .35s cubic-bezier(.3,1.4,.5,1)',
     }}>
