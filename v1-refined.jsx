@@ -23,6 +23,163 @@ const V1_EXAMPLES = (c) => {
 const V1_STORAGE_KEY = 'qc-v1-state';
 const V1_MAX_CHARS = 120;
 
+const V1_SIZES = {
+  S: { width: 140, minHeight: 110, fontSize: 15, label: 'S' },
+  M: { width: 180, minHeight: 150, fontSize: 18, label: 'M' },
+  L: { width: 240, minHeight: 190, fontSize: 22, label: 'L' },
+};
+
+const V1_COLORS = [
+  { hex:'#2d2a26', label:'먹' },
+  { hex:'#C0392B', label:'빨강' },
+  { hex:'#1A6FA8', label:'파랑' },
+  { hex:'#1E8449', label:'초록' },
+  { hex:'#D4680A', label:'주황' },
+  { hex:'#6B3FA0', label:'보라' },
+];
+
+const V1DrawCanvas = React.forwardRef(function V1DrawCanvas({ bgColor='#fff', penColor='#2d2a26', initialDataURL=null }, ref) {
+  const canvasEl = React.useRef(null);
+  const isDrawing = React.useRef(false);
+  const isDirtyRef = React.useRef(false);
+  const [penSize, setPenSize] = React.useState(4);
+  const penColorRef = React.useRef(penColor);
+
+  React.useEffect(() => { penColorRef.current = penColor; }, [penColor]);
+
+  React.useEffect(() => {
+    const canvas = canvasEl.current;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 280 * dpr;
+    canvas.height = 160 * dpr;
+    canvas.style.width = '280px';
+    canvas.style.height = '160px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    if (initialDataURL) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, 280, 160);
+      img.src = initialDataURL;
+    }
+  }, []);
+
+  React.useImperativeHandle(ref, () => ({
+    getDataURL: () => canvasEl.current.toDataURL('image/jpeg', 0.75),
+    isDirty: () => isDirtyRef.current,
+    clear: () => {
+      const ctx = canvasEl.current.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 280, 160);
+      isDirtyRef.current = false;
+    },
+  }));
+
+  const getPos = (e) => {
+    const rect = canvasEl.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const onPointerDown = (e) => {
+    isDrawing.current = true;
+    isDirtyRef.current = true;
+    canvasEl.current.setPointerCapture(e.pointerId);
+    const ctx = canvasEl.current.getContext('2d');
+    ctx.lineWidth = penSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = penColorRef.current;
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+  const onPointerMove = (e) => {
+    if (!isDrawing.current) return;
+    const ctx = canvasEl.current.getContext('2d');
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+  const onPointerUp = () => { isDrawing.current = false; };
+
+  const clearAll = () => {
+    const ctx = canvasEl.current.getContext('2d');
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    isDirtyRef.current = false;
+  };
+
+  return (
+    <div>
+      <canvas
+        ref={canvasEl}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          display:'block', border:`2px solid #e5ddc6`, borderRadius:10,
+          cursor:'crosshair', touchAction:'none', background: bgColor,
+        }}
+      />
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
+        {[{size:2,label:'얇게'},{size:5,label:'보통'},{size:10,label:'굵게'}].map(p => (
+          <button key={p.size} onClick={() => setPenSize(p.size)} style={{
+            fontFamily:'Jua', fontSize:12, padding:'3px 10px', borderRadius:999,
+            border:'2px solid #2d2a26',
+            background: penSize === p.size ? '#2d2a26' : '#fff',
+            color: penSize === p.size ? '#fff' : '#2d2a26',
+            cursor:'pointer',
+          }}>{p.label}</button>
+        ))}
+        <button onClick={clearAll} style={{
+          marginLeft:'auto', fontFamily:'Jua', fontSize:12, padding:'3px 10px', borderRadius:999,
+          border:'2px solid #D63384', color:'#D63384', background:'#fff', cursor:'pointer',
+        }}>전체 지우기</button>
+      </div>
+    </div>
+  );
+});
+
+function V1NoteOptions({ size, onSize, penColor, onPenColor, typeColor, showColor }) {
+  return (
+    <div className="qc-no-print" style={{display:'flex', flexDirection:'column', gap:5}}>
+      <div style={{display:'flex', alignItems:'center', gap:6}}>
+        <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:28}}>크기</span>
+        <div style={{display:'flex', gap:4}}>
+          {Object.entries(V1_SIZES).map(([k, v]) => (
+            <button key={k} onClick={()=>onSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:32, height:26, borderRadius:6,
+              border:`1.5px solid ${typeColor}`,
+              background: size===k ? typeColor : '#fff',
+              color: size===k ? '#fff' : typeColor,
+              cursor:'pointer',
+            }}>{v.label}</button>
+          ))}
+        </div>
+      </div>
+      {showColor && (
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:28}}>색</span>
+          <div style={{display:'flex', gap:4}}>
+            {V1_COLORS.map(c => (
+              <button key={c.hex} onClick={()=>onPenColor(c.hex)}
+                title={c.label}
+                style={{
+                  width:20, height:20, borderRadius:'50%', background:c.hex, cursor:'pointer',
+                  border: penColor===c.hex ? '3px solid #2d2a26' : '2px solid rgba(0,0,0,.15)',
+                  boxShadow: penColor===c.hex ? '0 0 0 2px rgba(255,255,255,.8)' : 'none',
+                  padding:0,
+                }}/>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function V1Toast({toast}){
   return <div className="qc-no-print" style={{
     position:'absolute', bottom:18, left:'50%', transform:'translateX(-50%)',
@@ -78,14 +235,20 @@ function V1({width=1100, height=1400}){
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      // 질문/설정(수업 콘텐츠)만 localStorage에 저장
       localStorage.setItem(V1_STORAGE_KEY, JSON.stringify({
         notes, char1, char2, situation, nextId: idRef.current,
       }));
-      // 이름/학년반은 sessionStorage에만 저장
       sessionStorage.setItem('qc-v1-name', name);
       sessionStorage.setItem('qc-v1-class', classInfo);
-    } catch {}
+    } catch(e) {
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        showToast('저장 공간이 부족해요. 손글씨 노트가 많으면 줄여주세요 🗂️');
+        try {
+          sessionStorage.setItem('qc-v1-name', name);
+          sessionStorage.setItem('qc-v1-class', classInfo);
+        } catch {}
+      }
+    }
   }, [hydrated, notes, name, classInfo, char1, char2, situation]);
 
   const showToast = (msg, action) => {
@@ -94,22 +257,34 @@ function V1({width=1100, height=1400}){
     toastTimer.current = setTimeout(()=>setToast(null), action ? 4000 : 1800);
   };
 
-  const nextPos = (currentNotes) => {
-    const cols = Math.floor(1008 / (180 + 22));
+  const nextPos = (currentNotes, sz) => {
+    const s = V1_SIZES[sz||'M'];
+    const cols = Math.floor(1008 / (s.width + 22));
     const idx = currentNotes.length;
-    return { x: 28 + (idx % cols) * (180 + 22), y: 28 + Math.floor(idx / cols) * (150 + 22) };
+    return { x: 28 + (idx % cols) * (s.width + 22), y: 28 + Math.floor(idx / cols) * (s.minHeight + 22) };
   };
 
-  const addNote = (type) => {
+  const addNote = (type, size, penColor) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
     if(text.length > V1_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V1_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
     const tilt = (Math.random()*10 - 5).toFixed(1);
     setNotes(n => {
-      const pos = nextPos(n);
-      return [...n, {id:idRef.current++, type, text, tilt, x:pos.x, y:pos.y}];
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text, tilt, size:size||'M', penColor:penColor||'#2d2a26', drawData:null, x:pos.x, y:pos.y}];
     });
     setInputs(i => ({...i, [type]:''}));
+    showToast('붙였어요! 🎉');
+  };
+
+  const addDrawNote = (type, canvasRef, size, penColor) => {
+    if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
+    const drawData = canvasRef.current.getDataURL();
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*10-5).toFixed(1), size:size||'M', penColor:penColor||'#2d2a26', drawData, x:pos.x, y:pos.y}];
+    });
+    canvasRef.current.clear();
     showToast('붙였어요! 🎉');
   };
   const delNote = (id) => {
@@ -128,8 +303,8 @@ function V1({width=1100, height=1400}){
     setNotes(n => n.map(note => note.id===id ? {...note, x, y} : note));
   };
 
-  const updateNote = (id, {text, type}) => {
-    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+  const updateNote = (id, patch) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, ...patch} : x));
     showToast('수정했어요 ✏️');
   };
 
@@ -257,7 +432,8 @@ function V1({width=1100, height=1400}){
           <V1TypeCard key={t.key} type={t}
             value={inputs[t.key]}
             onChange={(v)=>setInputs(i=>({...i,[t.key]:v}))}
-            onAdd={()=>addNote(t.key)}
+            onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
+            onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
           />
@@ -426,12 +602,16 @@ function V1Field({label, value, onChange, width, placeholder}){
   );
 }
 
-function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
+function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count}){
   const [h, setH] = React.useState(false);
   const [exampleUsed, setExampleUsed] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
+  const [inputMode, setInputMode] = React.useState('text');
+  const [noteSize, setNoteSize] = React.useState('M');
+  const [penColor, setPenColor] = React.useState('#2d2a26');
   const composing = React.useRef(false);
   const taRef = React.useRef(null);
+  const drawCanvasRef = React.useRef(null);
   const over = value.length > V1_MAX_CHARS;
 
   const handleExample = () => {
@@ -439,11 +619,11 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
     setExampleUsed(true);
     setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 50);
   };
-
   const handleChange = (v) => {
     onChange(v);
     if(exampleUsed) setExampleUsed(false);
   };
+
   return (
     <div style={{
       background:'#fff', border:'3px solid #2d2a26', borderRadius:20, padding:'16px 18px',
@@ -458,6 +638,7 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
         position:'absolute', top:10, right:14, fontFamily:'Jua', fontSize:13,
         background:'#fff', border:'2px solid #2d2a26', borderRadius:999, padding:'2px 10px',
       }}>{count}</span>
+
       <div style={{display:'flex', alignItems:'center', gap:10}}>
         <div style={{
           width:42, height:42, borderRadius:'50%', background:type.color,
@@ -472,6 +653,7 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
           alignItems:'center', justifyContent:'center', flexShrink:0, padding:0,
         }}>?</button>
       </div>
+
       {showDesc && (
         <div style={{
           fontFamily:'Noto Sans KR', fontSize:13, color:'#2d2a26', lineHeight:1.6,
@@ -479,45 +661,84 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
           padding:'8px 12px', marginTop:-4,
         }}>{type.desc}</div>
       )}
+
       <p style={{fontFamily:'Gaegu', fontSize:20, color:'#7a7064', margin:0, lineHeight:1.4}}>
         {type.hint[0]}<b style={{padding:'2px 8px', borderRadius:6, background:type.soft, color:'#2d2a26'}}>{type.hint[1]}</b>{type.hint[2]}
       </p>
-      <div className="qc-no-print" style={{position:'relative'}}>
-        <textarea ref={taRef} value={value} onChange={e=>handleChange(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
-          placeholder={type.placeholder}
-          style={{
-            fontFamily:'Gaegu', fontSize:20, border:`2px solid ${over ? '#D63384' : '#e5ddc6'}`, borderRadius:10,
-            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:66,
-            background: over ? '#fff0f6' : '#fffcf4', boxSizing:'border-box',
-          }} />
-        <span style={{
-          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
-          color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
-        }}>{value.length}/{V1_MAX_CHARS}</span>
+
+      {/* 입력 모드 탭 */}
+      <div className="qc-no-print" style={{display:'flex', gap:4, borderBottom:`2px solid ${type.soft}`}}>
+        {[{id:'text', label:'⌨️ 타자로'}, {id:'draw', label:'✏️ 손으로'}].map(m => (
+          <button key={m.id} onClick={()=>setInputMode(m.id)} style={{
+            fontFamily:'Jua', fontSize:13, padding:'5px 14px', border:'none', cursor:'pointer',
+            background: inputMode===m.id ? type.color : 'transparent',
+            color: inputMode===m.id ? '#fff' : type.color,
+            borderRadius:'6px 6px 0 0',
+          }}>{m.label}</button>
+        ))}
       </div>
-      <div className="qc-no-print" style={{display:'flex', gap:8, flexDirection:'column'}}>
-        {exampleUsed && (
-          <p style={{
-            fontFamily:'Noto Sans KR', fontSize:12, color:type.color, margin:0,
-            padding:'4px 8px', background:type.paper, borderRadius:6, fontWeight:500,
-          }}>✏️ 예시예요! 내 말로 바꿔서 써봐요</p>
-        )}
-        <div style={{display:'flex', gap:8}}>
-          <button onClick={handleExample} style={{
-            background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
-            fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
-            whiteSpace:'nowrap',
-          }}>힌트 💡</button>
-          <button onClick={onAdd} style={{
-            flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
-            color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
-            opacity: over ? 0.5 : 1,
-          }}>+ 도화지에 붙이기</button>
-        </div>
-      </div>
+
+      {/* 크기·색상 옵션 */}
+      <V1NoteOptions
+        size={noteSize} onSize={setNoteSize}
+        penColor={penColor} onPenColor={setPenColor}
+        typeColor={type.color}
+        showColor={inputMode==='draw'}
+      />
+
+      {inputMode === 'text' ? (
+        <>
+          <div className="qc-no-print" style={{position:'relative'}}>
+            <textarea ref={taRef} value={value} onChange={e=>handleChange(e.target.value)}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(noteSize, penColor); } }}
+              placeholder={type.placeholder}
+              style={{
+                fontFamily:'Gaegu', fontSize:20, border:`2px solid ${over ? '#D63384' : '#e5ddc6'}`, borderRadius:10,
+                padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:66,
+                background: over ? '#fff0f6' : '#fffcf4', boxSizing:'border-box',
+              }} />
+            <span style={{
+              position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
+              color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
+            }}>{value.length}/{V1_MAX_CHARS}</span>
+          </div>
+          <div className="qc-no-print" style={{display:'flex', gap:8, flexDirection:'column'}}>
+            {exampleUsed && (
+              <p style={{
+                fontFamily:'Noto Sans KR', fontSize:12, color:type.color, margin:0,
+                padding:'4px 8px', background:type.paper, borderRadius:6, fontWeight:500,
+              }}>✏️ 예시예요! 내 말로 바꿔서 써봐요</p>
+            )}
+            <div style={{display:'flex', gap:8}}>
+              <button onClick={handleExample} style={{
+                background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
+                fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
+                whiteSpace:'nowrap',
+              }}>힌트 💡</button>
+              <button onClick={()=>onAdd(noteSize, penColor)} style={{
+                flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
+                color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
+                opacity: over ? 0.5 : 1,
+              }}>+ 도화지에 붙이기</button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="qc-no-print">
+            <V1DrawCanvas ref={drawCanvasRef} bgColor={type.paper} penColor={penColor} />
+          </div>
+          <div className="qc-no-print">
+            <button onClick={()=>onAddDraw(drawCanvasRef, noteSize, penColor)} style={{
+              width:'100%', fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
+              color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
+              boxShadow:`2px 2px 0 #2d2a26`,
+            }}>+ 도화지에 붙이기</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -526,10 +747,14 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
+  const [draftSize, setDraftSize] = React.useState(note.size||'M');
   const [dragging, setDragging] = React.useState(false);
   const taRef = React.useRef(null);
+  const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
   const dragOffset = React.useRef({x:0, y:0});
+  const isDrawNote = !!note.drawData;
+  const sz = V1_SIZES[note.size||'M'];
 
   const onDragStart = (e) => {
     if(editing) return;
@@ -544,7 +769,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
     const board = e.currentTarget.closest('.v1-board');
     if(!board) return;
     const boardRect = board.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - boardRect.left - dragOffset.current.x, boardRect.width - 180));
+    const x = Math.max(0, Math.min(e.clientX - boardRect.left - dragOffset.current.x, boardRect.width - sz.width));
     const y = Math.max(0, e.clientY - boardRect.top - dragOffset.current.y);
     onMove(x, y);
   };
@@ -553,12 +778,18 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
   const openEdit = () => {
     setDraft(note.text);
     setDraftType(note.type);
+    setDraftSize(note.size||'M');
     setEditing(true);
-    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+    if(!isDrawNote) setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
   };
   const save = () => {
-    const t = draft.trim();
-    if(t) onUpdate({text:t, type:draftType});
+    if(isDrawNote){
+      const newData = editDrawRef.current?.isDirty() ? editDrawRef.current.getDataURL() : note.drawData;
+      onUpdate({text:'', type:draftType, drawData:newData, size:draftSize});
+    } else {
+      const t = draft.trim();
+      if(t) onUpdate({text:t, type:draftType, drawData:null, size:draftSize});
+    }
     setEditing(false);
   };
   const cancel = () => setEditing(false);
@@ -568,7 +799,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
     return (
       <div style={{position:'absolute', left: note.x ?? 28, top: note.y ?? 28, zIndex:200}}>
       <div className="v1-note qc-no-print" style={{
-        width:200, padding:'12px 14px', borderRadius:10,
+        width: isDrawNote ? 310 : 220, padding:'12px 14px', borderRadius:10,
         background:'#fff', border:`3px solid ${type.color}`,
         boxShadow:'4px 4px 0 #2d2a26', display:'flex', flexDirection:'column', gap:8,
         animation:'v1noteIn .2s ease',
@@ -584,15 +815,31 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
             }}>{t.icon} {t.label.replace(' 질문','')}</button>
           ))}
         </div>
-        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
-          style={{
-            fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType.soft}`,
-            borderRadius:8, padding:'8px 10px', resize:'none', outline:'none',
-            minHeight:70, boxSizing:'border-box', width:'100%',
-          }}/>
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:28}}>크기</span>
+          {Object.entries(V1_SIZES).map(([k,v])=>(
+            <button key={k} onClick={()=>setDraftSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:32, height:26, borderRadius:6,
+              border:`1.5px solid ${curType.color}`,
+              background: draftSize===k ? curType.color : '#fff',
+              color: draftSize===k ? '#fff' : curType.color,
+              cursor:'pointer',
+            }}>{v.label}</button>
+          ))}
+        </div>
+        {isDrawNote ? (
+          <V1DrawCanvas ref={editDrawRef} bgColor={curType.paper} penColor="#2d2a26" initialDataURL={note.drawData} />
+        ) : (
+          <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+            style={{
+              fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType.soft}`,
+              borderRadius:8, padding:'8px 10px', resize:'none', outline:'none',
+              minHeight:70, boxSizing:'border-box', width:'100%',
+            }}/>
+        )}
         <div style={{display:'flex', gap:6}}>
           <button onClick={save} style={{
             flex:1, fontFamily:'Jua', fontSize:14, padding:'7px 0', borderRadius:8,
@@ -621,9 +868,10 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
       style={{
         position:'absolute',
         left: note.x ?? 28, top: note.y ?? 28,
-        width:180, minHeight:150, padding:'14px 16px 30px',
-        fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize:18, lineHeight:1.35,
-        color:'#2d2a26', boxShadow: dragging ? '6px 10px 20px rgba(62,48,30,.32)' : '3px 6px 12px rgba(62,48,30,.18)',
+        width: sz.width, minHeight: sz.minHeight, padding:'14px 16px 30px',
+        fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize: sz.fontSize, lineHeight:1.35,
+        color: note.penColor && !isDrawNote ? note.penColor : '#2d2a26',
+        boxShadow: dragging ? '6px 10px 20px rgba(62,48,30,.32)' : '3px 6px 12px rgba(62,48,30,.18)',
         wordBreak:'keep-all', overflowWrap:'anywhere', borderRadius:2,
         background:type.soft, transform:`rotate(${note.tilt}deg)${dragging?' scale(1.04)':''}`,
         animation:'v1noteIn .3s ease', overflow:'hidden',
@@ -642,7 +890,11 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
         display:'inline-block', fontFamily:'Jua', fontSize:11, padding:'2px 8px',
         borderRadius:999, color:'#fff', marginBottom:8, background:type.color,
       }}>{type.label}</span>
-      <div style={{fontSize: note.text.length > 60 ? 15 : 18, lineHeight:1.4}}>{note.text}</div>
+      {note.drawData
+        ? <img src={note.drawData} alt="손글씨 질문"
+            style={{display:'block', width:'100%', height:'auto', borderRadius:4, marginTop:2}}/>
+        : <div>{note.text}</div>
+      }
       <button onClick={openEdit} className="qc-no-print" style={{
         position:'absolute', bottom:6, left:8, border:'none', background:'transparent',
         fontSize:14, cursor:'pointer', color:'#7a7064', padding:'2px 6px', borderRadius:6,
