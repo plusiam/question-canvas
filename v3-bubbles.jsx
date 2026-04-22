@@ -205,6 +205,16 @@ function V3({width=1100, height=1400}){
 
       {/* Header */}
       <div style={{position:'relative', zIndex:2, textAlign:'center', marginBottom:18}}>
+        <a href="index.html" className="qc-no-print" style={{
+          display:'inline-flex', alignItems:'center', gap:5,
+          fontFamily:'Jua', fontSize:13, color:'#555', textDecoration:'none',
+          background:'rgba(255,255,255,.75)', border:'2px solid rgba(0,0,0,.18)', borderRadius:100,
+          padding:'4px 14px', marginBottom:12,
+          transition:'background 0.12s',
+        }}
+        onMouseOver={e=>e.currentTarget.style.background='rgba(255,255,255,.95)'}
+        onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,.75)'}
+        >← 홈으로</a>
         <div style={{
           display:'inline-block', background:'#fff', borderRadius:40, padding:'24px 40px',
           border:'4px solid #2d2a26', boxShadow:'0 8px 0 #2d2a26',

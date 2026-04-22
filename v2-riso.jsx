@@ -217,6 +217,16 @@ function V2({width=1100, height=1400}){
         <V2Tape color="#FFC9B8" rotate={-6} width={90} top={-8} left={60} pattern="stripe"/>
         <V2Tape color="#C6E3CF" rotate={5} width={80} top={-8} left={'calc(100% - 160px)'} pattern="dot"/>
         <div style={{display:'flex', alignItems:'baseline', gap:14, flexWrap:'wrap'}}>
+          <a href="index.html" className="qc-no-print" style={{
+            display:'inline-flex', alignItems:'center', gap:5,
+            fontFamily:'Jua', fontSize:13, color:'#6B5445', textDecoration:'none',
+            background:'#F0E4D0', border:'2px solid #C8A882', borderRadius:100,
+            padding:'4px 12px', marginBottom:6, alignSelf:'flex-start',
+            transition:'background 0.12s',
+          }}
+          onMouseOver={e=>e.currentTarget.style.background='#E4D4BC'}
+          onMouseOut={e=>e.currentTarget.style.background='#F0E4D0'}
+          >← 홈으로</a>
           <h1 style={{fontFamily:'Jua', fontSize:44, margin:0, letterSpacing:'-0.02em', color:'#3C2F2A'}}>
             질문 공방 <span style={{fontSize:32}}>✂️</span>
           </h1>

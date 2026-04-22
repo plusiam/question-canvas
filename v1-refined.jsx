@@ -181,6 +181,16 @@ function V1({width=1100, height=1400}){
         <div style={{position:'absolute', right:-30, top:-60, fontFamily:'Jua', fontSize:240, color:'#fff2c8', zIndex:0, lineHeight:1}}>?</div>
         <div style={{position:'relative', zIndex:1}}>
           <div style={{display:'flex', alignItems:'baseline', gap:14, flexWrap:'wrap'}}>
+            <a href="index.html" className="qc-no-print" style={{
+              display:'inline-flex', alignItems:'center', gap:5,
+              fontFamily:'Jua', fontSize:13, color:'#7a7064', textDecoration:'none',
+              background:'#f5f0e8', border:'2px solid #c8bfb0', borderRadius:100,
+              padding:'4px 12px', marginBottom:6, alignSelf:'flex-start',
+              transition:'background 0.12s',
+            }}
+            onMouseOver={e=>e.currentTarget.style.background='#ede6d8'}
+            onMouseOut={e=>e.currentTarget.style.background='#f5f0e8'}
+            >← 홈으로</a>
             <h1 style={{fontFamily:'Jua', fontSize:46, margin:0, letterSpacing:'-0.02em', lineHeight:1.1}}>
               <span style={{display:'inline-block', transform:'rotate(-8deg)'}}>🤔</span> 질문 만들기 학습지
             </h1>
