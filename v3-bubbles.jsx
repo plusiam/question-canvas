@@ -37,24 +37,130 @@ function V3Face({type, size=70, talking=false}){
   }[type.mouth];
   return (
     <svg width={size} height={size} viewBox="-30 -30 60 60">
-      {/* left eye */}
       {eye==='round' && <circle cx="-9" cy="-5" r="3" fill="#2d2a26"/>}
       {eye==='sparkle' && <><circle cx="-9" cy="-5" r="3.5" fill="#2d2a26"/><circle cx="-8" cy="-6" r="1" fill="#fff"/></>}
       {eye==='curved' && <path d="M-13 -5 Q-9 -9 -5 -5" stroke="#2d2a26" strokeWidth="2.5" fill="none" strokeLinecap="round"/>}
       {eye==='star' && <path d="M-9 -8 L-8 -5 L-5 -4 L-8 -3 L-9 0 L-10 -3 L-13 -4 L-10 -5 z" fill="#2d2a26"/>}
-      {/* right eye */}
       {eye==='round' && <circle cx="9" cy="-5" r="3" fill="#2d2a26"/>}
       {eye==='sparkle' && <><circle cx="9" cy="-5" r="3.5" fill="#2d2a26"/><circle cx="10" cy="-6" r="1" fill="#fff"/></>}
       {eye==='curved' && <path d="M5 -5 Q9 -9 13 -5" stroke="#2d2a26" strokeWidth="2.5" fill="none" strokeLinecap="round"/>}
       {eye==='star' && <path d="M9 -8 L10 -5 L13 -4 L10 -3 L9 0 L8 -3 L5 -4 L8 -5 z" fill="#2d2a26"/>}
-      {/* cheeks */}
       <circle cx="-12" cy="3" r="3.5" fill={type.deep} opacity=".35"/>
       <circle cx="12" cy="3" r="3.5" fill={type.deep} opacity=".35"/>
-      {/* mouth */}
       <path d={mouthPath} stroke="#2d2a26" strokeWidth="2.5" fill={type.mouth==='open'?'#2d2a26':'none'} strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
+
+/* ── DrawCanvas (v3 스타일) ── */
+const V3DrawCanvas = React.forwardRef(function V3DrawCanvas({ bgColor='#fff', penColor='#2d2a26', initialDataURL=null }, ref) {
+  const canvasEl = React.useRef(null);
+  const isDrawing = React.useRef(false);
+  const isDirtyRef = React.useRef(false);
+  const [penSize, setPenSize] = React.useState(4);
+
+  React.useEffect(() => {
+    const canvas = canvasEl.current;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 280 * dpr;
+    canvas.height = 160 * dpr;
+    canvas.style.width = '280px';
+    canvas.style.height = '160px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    if (initialDataURL) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, 280, 160);
+      img.src = initialDataURL;
+    }
+  }, []);
+
+  React.useImperativeHandle(ref, () => ({
+    getDataURL: () => canvasEl.current.toDataURL('image/jpeg', 0.75),
+    isDirty: () => isDirtyRef.current,
+    clear: () => {
+      const ctx = canvasEl.current.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 280, 160);
+      isDirtyRef.current = false;
+    },
+  }));
+
+  const getPos = (e) => {
+    const rect = canvasEl.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const onPointerDown = (e) => {
+    isDrawing.current = true;
+    isDirtyRef.current = true;
+    canvasEl.current.setPointerCapture(e.pointerId);
+    const ctx = canvasEl.current.getContext('2d');
+    ctx.lineWidth = penSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = penColor;
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDrawing.current) return;
+    const ctx = canvasEl.current.getContext('2d');
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const onPointerUp = () => { isDrawing.current = false; };
+
+  const clearAll = () => {
+    const ctx = canvasEl.current.getContext('2d');
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    isDirtyRef.current = false;
+  };
+
+  const penSizes = [
+    { size: 2, label: '얇게' },
+    { size: 5, label: '보통' },
+    { size: 10, label: '굵게' },
+  ];
+
+  return (
+    <div>
+      <canvas
+        ref={canvasEl}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          display:'block', border:'2px solid #2d2a26', borderRadius:12,
+          cursor:'crosshair', touchAction:'none', background: bgColor,
+        }}
+      />
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
+        {penSizes.map(p => (
+          <button key={p.size} onClick={() => setPenSize(p.size)} style={{
+            fontFamily:'Jua', fontSize:12, padding:'3px 10px', borderRadius:999,
+            border:'2px solid #2d2a26',
+            background: penSize === p.size ? '#2d2a26' : '#fff',
+            color: penSize === p.size ? '#fff' : '#2d2a26',
+            cursor:'pointer',
+          }}>{p.label}</button>
+        ))}
+        <button onClick={clearAll} style={{
+          marginLeft:'auto', fontFamily:'Jua', fontSize:12, padding:'3px 10px', borderRadius:999,
+          border:'2px solid #F06AA3', color:'#F06AA3', background:'#fff', cursor:'pointer',
+        }}>전체 지우기</button>
+      </div>
+    </div>
+  );
+});
 
 function V3Toast({toast}){
   return <div className="qc-no-print" style={{
@@ -99,7 +205,6 @@ function V3({width=1100, height=1400}){
         if (typeof s.situation === 'string') setSituation(s.situation);
         if (Number.isFinite(s.nextId)) idRef.current = s.nextId;
       }
-      // 이름/학년반은 sessionStorage에서만 복원 (탭 닫으면 자동 삭제)
       const sName = sessionStorage.getItem('qc-v3-name');
       const sClass = sessionStorage.getItem('qc-v3-class');
       if (sName) setName(sName);
@@ -111,14 +216,20 @@ function V3({width=1100, height=1400}){
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      // 질문/설정(수업 콘텐츠)만 localStorage에 저장
       localStorage.setItem(V3_STORAGE_KEY, JSON.stringify({
         notes, char1, char2, situation, nextId: idRef.current,
       }));
-      // 이름/학년반은 sessionStorage에만 저장
       sessionStorage.setItem('qc-v3-name', name);
       sessionStorage.setItem('qc-v3-class', classInfo);
-    } catch {}
+    } catch(e) {
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        showToast('저장 공간이 부족해요. 손글씨 노트가 많으면 줄여주세요 🗂️');
+        try {
+          sessionStorage.setItem('qc-v3-name', name);
+          sessionStorage.setItem('qc-v3-class', classInfo);
+        } catch {}
+      }
+    }
   }, [hydrated, notes, name, classInfo, char1, char2, situation]);
 
   const showToast = (msg, action) => {
@@ -131,10 +242,19 @@ function V3({width=1100, height=1400}){
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
     if(text.length > V3_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V3_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1)}]);
+    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1), drawData:null}]);
     setInputs(i => ({...i, [type]:''}));
     showToast('질문이 떠올랐어요! 🎈');
   };
+
+  const addDrawNote = (type, canvasRef) => {
+    if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
+    const drawData = canvasRef.current.getDataURL();
+    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*8-4).toFixed(1), drawData}]);
+    canvasRef.current.clear();
+    showToast('질문이 떠올랐어요! 🎈');
+  };
+
   const delNote = (id) => {
     const found = notes.find(n=>n.id===id);
     if(!found) return;
@@ -147,8 +267,8 @@ function V3({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
-  const updateNote = (id, {text, type}) => {
-    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+  const updateNote = (id, {text, type, drawData}) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, text, type, drawData: drawData !== undefined ? drawData : x.drawData} : x));
     showToast('수정했어요 ✏️');
   };
 
@@ -202,7 +322,6 @@ function V3({width=1100, height=1400}){
       background: 'linear-gradient(180deg, #C7E9FF 0%, #FFF3D0 55%, #FFDDE9 100%)',
       padding:'36px 44px 60px', boxSizing:'border-box', overflow:'hidden',
     }}>
-      {/* floating decorative bubbles */}
       <div style={{position:'absolute', top:80, right:40, width:60, height:60, borderRadius:'50%', background:'rgba(255,255,255,.5)', boxShadow:'inset -6px -6px 0 rgba(255,255,255,.6)'}}/>
       <div style={{position:'absolute', top:260, left:20, width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,.5)'}}/>
       <div style={{position:'absolute', bottom:180, right:60, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,.4)'}}/>
@@ -230,7 +349,6 @@ function V3({width=1100, height=1400}){
           <p style={{fontFamily:'Gaegu', fontSize:20, color:'#7a7064', margin:'6px 0 0'}}>
             네 친구와 함께 이야기 속 궁금한 걸 물어봐요!
           </p>
-          {/* tail */}
           <div style={{position:'absolute', bottom:-18, left:'50%', transform:'translateX(-50%)',
             width:0, height:0, borderLeft:'16px solid transparent', borderRight:'16px solid transparent',
             borderTop:'18px solid #2d2a26'}}/>
@@ -275,6 +393,7 @@ function V3({width=1100, height=1400}){
             value={inputs[t.key]}
             onChange={v=>setInputs(s=>({...s,[t.key]:v}))}
             onAdd={()=>addNote(t.key)}
+            onAddDraw={(ref)=>addDrawNote(t.key, ref)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
             focused={focused===t.key}
@@ -315,7 +434,6 @@ function V3({width=1100, height=1400}){
           boxShadow:'0 6px 0 #2d2a26',
           display:'flex', flexWrap:'wrap', gap:18, alignContent:'flex-start', overflow:'hidden',
         }}>
-          {/* decorative clouds */}
           <div aria-hidden style={{position:'absolute', top:18, right:40, width:70, height:30, background:'#fff', borderRadius:20, opacity:.6}}/>
           <div aria-hidden style={{position:'absolute', top:26, right:80, width:40, height:20, background:'#fff', borderRadius:14, opacity:.6}}/>
           <div aria-hidden style={{position:'absolute', bottom:20, left:40, width:60, height:26, background:'#fff', borderRadius:16, opacity:.5}}/>
@@ -353,19 +471,21 @@ function V3({width=1100, height=1400}){
   );
 }
 
-function V3Character({type, idx, value, onChange, onAdd, onExample, count, focused, onFocus, onBlur}){
+function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur}){
   const [hover, setHover] = React.useState(false);
+  const [inputMode, setInputMode] = React.useState('text');
   const composing = React.useRef(false);
+  const drawCanvasRef = React.useRef(null);
   const over = value.length > V3_MAX_CHARS;
   const lean = [-2, 1.5, -1, 2][idx];
   const talking = focused || value.length > 0;
+
   return (
     <div style={{
       position:'relative',
       transform:`rotate(${lean}deg) ${hover?'translateY(-4px)':''}`,
       transition:'transform .2s',
     }} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
-      {/* speech-bubble shape */}
       <div style={{
         background: type.color, borderRadius:'32px 32px 32px 6px',
         border:'3px solid #2d2a26', padding:'18px 16px 16px',
@@ -374,14 +494,12 @@ function V3Character({type, idx, value, onChange, onAdd, onExample, count, focus
         animation:`v3float 3.5s ease-in-out ${idx*.3}s infinite`,
         '--t': `${lean}deg`,
       }}>
-        {/* counter badge */}
         <div style={{
           position:'absolute', top:-12, right:-12, width:34, height:34, borderRadius:'50%',
           background:'#fff', border:'3px solid #2d2a26', display:'flex', alignItems:'center', justifyContent:'center',
           fontFamily:'Jua', fontSize:15, zIndex:2,
         }}>{count}</div>
 
-        {/* character face */}
         <div style={{display:'flex', flexDirection:'column', alignItems:'center', marginBottom:10}}>
           <div style={{
             background:'#fff', borderRadius:'50%', border:'3px solid #2d2a26',
@@ -398,36 +516,65 @@ function V3Character({type, idx, value, onChange, onAdd, onExample, count, focus
           </div>
         </div>
 
-        <div style={{position:'relative'}}>
-          <textarea value={value} onChange={e=>onChange(e.target.value)}
-            onFocus={onFocus} onBlur={onBlur}
-            onCompositionStart={()=>{ composing.current=true; }}
-            onCompositionEnd={()=>{ composing.current=false; }}
-            onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
-            placeholder={type.placeholder}
-            className="qc-no-print"
-            style={{
-              fontFamily:'Gaegu', fontSize:17, border:`2px solid ${over ? '#D63384' : '#2d2a26'}`, borderRadius:14,
-              padding:'8px 10px', resize:'none', outline:'none', width:'100%', minHeight:60,
-              background: over ? '#fff0f6' : '#fff', boxSizing:'border-box', color:'#2d2a26',
-            }}/>
-          <span className="qc-no-print" style={{
-            position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:10,
-            color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
-          }}>{value.length}/{V3_MAX_CHARS}</span>
+        {/* 입력 모드 탭 */}
+        <div className="qc-no-print" style={{display:'flex', gap:4, marginBottom:8, justifyContent:'center'}}>
+          {[{id:'text', label:'⌨️'}, {id:'draw', label:'✏️'}].map(m => (
+            <button key={m.id} onClick={()=>setInputMode(m.id)} style={{
+              fontFamily:'Jua', fontSize:12, padding:'4px 12px', borderRadius:999,
+              border:'2px solid #2d2a26',
+              background: inputMode===m.id ? '#2d2a26' : 'rgba(255,255,255,.8)',
+              color: inputMode===m.id ? '#fff' : '#2d2a26',
+              cursor:'pointer',
+            }}>{m.label} {m.id==='text' ? '타자' : '손글씨'}</button>
+          ))}
         </div>
 
-        <div className="qc-no-print" style={{display:'flex', gap:6, marginTop:8}}>
-          <button onClick={onExample} style={{
-            background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'7px 8px',
-            fontSize:12, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26',
-          }}>💡</button>
-          <button onClick={onAdd} style={{
-            flex:1, fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
-            color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
-            boxShadow:'2px 2px 0 #2d2a26', opacity: over ? 0.5 : 1,
-          }}>🎈 띄우기</button>
-        </div>
+        {inputMode === 'text' ? (
+          <>
+            <div style={{position:'relative'}}>
+              <textarea value={value} onChange={e=>onChange(e.target.value)}
+                onFocus={onFocus} onBlur={onBlur}
+                onCompositionStart={()=>{ composing.current=true; }}
+                onCompositionEnd={()=>{ composing.current=false; }}
+                onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
+                placeholder={type.placeholder}
+                className="qc-no-print"
+                style={{
+                  fontFamily:'Gaegu', fontSize:17, border:`2px solid ${over ? '#D63384' : '#2d2a26'}`, borderRadius:14,
+                  padding:'8px 10px', resize:'none', outline:'none', width:'100%', minHeight:60,
+                  background: over ? '#fff0f6' : '#fff', boxSizing:'border-box', color:'#2d2a26',
+                }}/>
+              <span className="qc-no-print" style={{
+                position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:10,
+                color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
+              }}>{value.length}/{V3_MAX_CHARS}</span>
+            </div>
+            <div className="qc-no-print" style={{display:'flex', gap:6, marginTop:8}}>
+              <button onClick={onExample} style={{
+                background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'7px 8px',
+                fontSize:12, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26',
+              }}>💡</button>
+              <button onClick={onAdd} style={{
+                flex:1, fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
+                color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
+                boxShadow:'2px 2px 0 #2d2a26', opacity: over ? 0.5 : 1,
+              }}>🎈 띄우기</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="qc-no-print">
+              <V3DrawCanvas ref={drawCanvasRef} bgColor="#fff" penColor={type.deep} />
+            </div>
+            <div className="qc-no-print" style={{marginTop:8}}>
+              <button onClick={()=>onAddDraw(drawCanvasRef)} style={{
+                width:'100%', fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
+                color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
+                boxShadow:'2px 2px 0 #2d2a26',
+              }}>🎈 띄우기</button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* tail */}
@@ -443,17 +590,26 @@ function V3Bubble({note, type, onDel, onUpdate}){
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
   const taRef = React.useRef(null);
+  const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
+  const isDrawNote = !!note.drawData;
 
   const openEdit = () => {
     setDraft(note.text);
     setDraftType(note.type);
     setEditing(true);
-    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+    if (!isDrawNote) setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
   };
   const save = () => {
-    const t = draft.trim();
-    if(t) onUpdate({text:t, type:draftType});
+    if (isDrawNote) {
+      const newData = editDrawRef.current?.isDirty()
+        ? editDrawRef.current.getDataURL()
+        : note.drawData;
+      onUpdate({text:'', type:draftType, drawData:newData});
+    } else {
+      const t = draft.trim();
+      if(t) onUpdate({text:t, type:draftType, drawData:null});
+    }
     setEditing(false);
   };
   const cancel = () => setEditing(false);
@@ -462,7 +618,7 @@ function V3Bubble({note, type, onDel, onUpdate}){
   if(editing){
     return (
       <div className="qc-no-print" style={{
-        position:'relative', width:220,
+        position:'relative', width: isDrawNote ? 320 : 220,
         background:'#fff', border:`3px solid ${type.color}`,
         borderRadius:16, padding:'12px 14px',
         boxShadow:`0 6px 0 ${type.deep}`,
@@ -477,18 +633,22 @@ function V3Bubble({note, type, onDel, onUpdate}){
               background: draftType===t.key ? t.color : '#fff',
               color: draftType===t.key ? '#fff' : t.deep,
               cursor:'pointer',
-            }}>{t.icon} {t.label.replace(' 질문','')}</button>
+            }}>{t.icon} {t.label}</button>
           ))}
         </div>
-        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
-          style={{
-            fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType ? curType.color : '#ccc'}`,
-            borderRadius:10, padding:'8px 10px', resize:'none', outline:'none',
-            minHeight:70, boxSizing:'border-box', width:'100%',
-          }}/>
+        {isDrawNote ? (
+          <V3DrawCanvas ref={editDrawRef} bgColor="#fff" penColor={curType ? curType.deep : '#2d2a26'} initialDataURL={note.drawData} />
+        ) : (
+          <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+            style={{
+              fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType ? curType.color : '#ccc'}`,
+              borderRadius:10, padding:'8px 10px', resize:'none', outline:'none',
+              minHeight:70, boxSizing:'border-box', width:'100%',
+            }}/>
+        )}
         <div style={{display:'flex', gap:6}}>
           <button onClick={save} style={{
             flex:1, fontFamily:'Jua', fontSize:14, padding:'7px 0', borderRadius:999,
@@ -509,7 +669,7 @@ function V3Bubble({note, type, onDel, onUpdate}){
 
   return (
     <div style={{
-      position:'relative', width:200,
+      position:'relative', width: isDrawNote ? 220 : 200,
       animation:'v3bubblein .35s cubic-bezier(.3,1.4,.5,1)',
     }}>
       <div style={{
@@ -535,7 +695,11 @@ function V3Bubble({note, type, onDel, onUpdate}){
             color:'#7a7064', fontSize:14,
           }}>✕</button>
         </div>
-        <div>{note.text}</div>
+        {note.drawData
+          ? <img src={note.drawData} alt="손글씨 질문"
+              style={{display:'block', width:'100%', height:'auto', borderRadius:8}}/>
+          : <div>{note.text}</div>
+        }
       </div>
     </div>
   );

@@ -60,6 +60,119 @@ const V2Tape = ({color='#FFE8A3', rotate=-4, width=80, top=-10, left=20, pattern
   }} />
 );
 
+/* ── DrawCanvas (v2 스타일) ── */
+const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED', penColor='#3C2F2A', initialDataURL=null }, ref) {
+  const canvasEl = React.useRef(null);
+  const isDrawing = React.useRef(false);
+  const isDirtyRef = React.useRef(false);
+  const [penSize, setPenSize] = React.useState(4);
+
+  React.useEffect(() => {
+    const canvas = canvasEl.current;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 280 * dpr;
+    canvas.height = 160 * dpr;
+    canvas.style.width = '280px';
+    canvas.style.height = '160px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    if (initialDataURL) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, 280, 160);
+      img.src = initialDataURL;
+    }
+  }, []);
+
+  React.useImperativeHandle(ref, () => ({
+    getDataURL: () => canvasEl.current.toDataURL('image/jpeg', 0.75),
+    isDirty: () => isDirtyRef.current,
+    clear: () => {
+      const canvas = canvasEl.current;
+      const dpr = window.devicePixelRatio || 1;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 280, 160);
+      isDirtyRef.current = false;
+    },
+  }));
+
+  const getPos = (e) => {
+    const rect = canvasEl.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const onPointerDown = (e) => {
+    isDrawing.current = true;
+    isDirtyRef.current = true;
+    canvasEl.current.setPointerCapture(e.pointerId);
+    const ctx = canvasEl.current.getContext('2d');
+    ctx.lineWidth = penSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = penColor;
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDrawing.current) return;
+    const ctx = canvasEl.current.getContext('2d');
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const onPointerUp = () => { isDrawing.current = false; };
+
+  const clearAll = () => {
+    const canvas = canvasEl.current;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 280, 160);
+    isDirtyRef.current = false;
+  };
+
+  const penSizes = [
+    { size: 2, label: '얇게' },
+    { size: 5, label: '보통' },
+    { size: 10, label: '굵게' },
+  ];
+
+  return (
+    <div>
+      <canvas
+        ref={canvasEl}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          display:'block', border:'1.5px solid #3C2F2A', cursor:'crosshair',
+          touchAction:'none', background: bgColor,
+        }}
+      />
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
+        {penSizes.map(p => (
+          <button key={p.size} onClick={() => setPenSize(p.size)} style={{
+            fontFamily:'Jua', fontSize:12, padding:'3px 10px',
+            border:`1.5px solid #3C2F2A`,
+            background: penSize === p.size ? '#3C2F2A' : 'transparent',
+            color: penSize === p.size ? '#FFF8ED' : '#3C2F2A',
+            cursor:'pointer',
+          }}>{p.label}</button>
+        ))}
+        <button onClick={clearAll} style={{
+          marginLeft:'auto', fontFamily:'Jua', fontSize:12, padding:'3px 10px',
+          border:'1.5px solid #C85A86', color:'#C85A86', background:'transparent', cursor:'pointer',
+        }}>전체 지우기</button>
+      </div>
+    </div>
+  );
+});
+
 function V2Toast({toast}){
   return <div className="qc-no-print" style={{
     position:'absolute', bottom:18, left:'50%', transform:'translateX(-50%) rotate(-1deg)',
@@ -103,7 +216,6 @@ function V2({width=1100, height=1400}){
         if (typeof s.situation === 'string') setSituation(s.situation);
         if (Number.isFinite(s.nextId)) idRef.current = s.nextId;
       }
-      // 이름/학년반은 sessionStorage에서만 복원 (탭 닫으면 자동 삭제)
       const sName = sessionStorage.getItem('qc-v2-name');
       const sClass = sessionStorage.getItem('qc-v2-class');
       if (sName) setName(sName);
@@ -115,14 +227,20 @@ function V2({width=1100, height=1400}){
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      // 질문/설정(수업 콘텐츠)만 localStorage에 저장
       localStorage.setItem(V2_STORAGE_KEY, JSON.stringify({
         notes, char1, char2, situation, nextId: idRef.current,
       }));
-      // 이름/학년반은 sessionStorage에만 저장
       sessionStorage.setItem('qc-v2-name', name);
       sessionStorage.setItem('qc-v2-class', classInfo);
-    } catch {}
+    } catch(e) {
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        showToast('저장 공간이 부족해요. 손글씨 노트가 많으면 줄여주세요 🗂️');
+        try {
+          sessionStorage.setItem('qc-v2-name', name);
+          sessionStorage.setItem('qc-v2-class', classInfo);
+        } catch {}
+      }
+    }
   }, [hydrated, notes, name, classInfo, char1, char2, situation]);
 
   const showToast = (msg, action) => {
@@ -135,10 +253,19 @@ function V2({width=1100, height=1400}){
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요'); return; }
     if(text.length > V2_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V2_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*12-6).toFixed(1)}]);
+    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*12-6).toFixed(1), drawData:null}]);
     setInputs(i => ({...i, [type]:''}));
     showToast('도화지에 붙였어요!');
   };
+
+  const addDrawNote = (type, canvasRef) => {
+    if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
+    const drawData = canvasRef.current.getDataURL();
+    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*12-6).toFixed(1), drawData}]);
+    canvasRef.current.clear();
+    showToast('도화지에 붙였어요!');
+  };
+
   const delNote = (id) => {
     const found = notes.find(n=>n.id===id);
     if(!found) return;
@@ -151,8 +278,8 @@ function V2({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
-  const updateNote = (id, {text, type}) => {
-    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+  const updateNote = (id, {text, type, drawData}) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, text, type, drawData: drawData !== undefined ? drawData : x.drawData} : x));
     showToast('수정했어요 ✏️');
   };
 
@@ -210,10 +337,9 @@ function V2({width=1100, height=1400}){
       background:'#F4EBD9',
       padding:'40px 44px 60px', boxSizing:'border-box',
     }}>
-      {/* grain overlay */}
       <div style={{position:'absolute', inset:0, backgroundImage:grain, pointerEvents:'none', mixBlendMode:'multiply', opacity:.35}} />
 
-      {/* Header — torn paper banner */}
+      {/* Header */}
       <div style={{position:'relative', padding:'24px 30px', background:'#FFF8ED',
         boxShadow:'0 4px 0 rgba(60,47,42,.15), 6px 10px 24px rgba(60,47,42,.12)',
         clipPath:'polygon(0 6%, 2% 0, 14% 4%, 28% 1%, 46% 5%, 66% 1%, 82% 4%, 98% 0, 100% 7%, 99% 94%, 97% 100%, 80% 96%, 58% 99%, 34% 96%, 16% 100%, 2% 97%, 1% 100%, 0 94%)',
@@ -273,6 +399,7 @@ function V2({width=1100, height=1400}){
             value={inputs[t.key]}
             onChange={v=>setInputs(i=>({...i,[t.key]:v}))}
             onAdd={()=>addNote(t.key)}
+            onAddDraw={(ref)=>addDrawNote(t.key, ref)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
           />
@@ -291,7 +418,6 @@ function V2({width=1100, height=1400}){
               <span key={t.key} style={{
                 fontFamily:'Jua', fontSize:14, padding:'4px 12px',
                 background:t.paper, color:t.color, border:`1.5px solid ${t.color}`,
-                transform:`rotate(${(Math.random()*4-2).toFixed(1)}deg)`,
                 display:'inline-flex', alignItems:'center', gap:6,
               }}>
                 <span style={{width:8, height:8, borderRadius:'50%', background:t.color}}/>
@@ -313,7 +439,6 @@ function V2({width=1100, height=1400}){
           boxShadow:'6px 6px 0 #3C2F2A',
           display:'flex', flexWrap:'wrap', gap:22, alignContent:'flex-start',
         }}>
-          {/* corner tapes */}
           <V2Tape color="#FFC9B8" rotate={-40} width={70} top={-14} left={-18} pattern="stripe"/>
           <V2Tape color="#C6E3CF" rotate={38} width={70} top={-14} left={'calc(100% - 52px)'} pattern="dot"/>
 
@@ -370,13 +495,16 @@ function V2Input({label, value, onChange}){
   );
 }
 
-function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
+function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, idx}){
   const [h, setH] = React.useState(false);
+  const [inputMode, setInputMode] = React.useState('text');
   const composing = React.useRef(false);
+  const drawCanvasRef = React.useRef(null);
   const over = value.length > V2_MAX_CHARS;
   const rotations = [-1.2, 1, -0.6, 1.5];
   const tapeColors = ['#FFE8A3', '#FFC9B8', '#C6E3CF', '#E1D9EF'];
   const tapePatterns = ['stripe', 'dot', 'plain', 'stripe'];
+
   return (
     <div style={{
       position:'relative', background:type.paper,
@@ -413,36 +541,65 @@ function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
       <div style={{
         fontFamily:'Gaegu', fontSize:20, color:'#6B5445',
         padding:'6px 0', borderBottom:`2px dashed ${type.color}`,
-      }}>“ {type.hint} ”</div>
+      }}>" {type.hint} "</div>
 
-      <div style={{position:'relative'}}>
-        <textarea value={value} onChange={e=>onChange(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
-          placeholder={type.placeholder}
-          className="qc-no-print"
-          style={{
-            fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over ? '#D63384' : type.color}`,
-            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
-            background: over ? '#fff0f6' : '#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
-          }}/>
-        <span className="qc-no-print" style={{
-          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
-          color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
-        }}>{value.length}/{V2_MAX_CHARS}</span>
+      {/* 입력 모드 탭 */}
+      <div className="qc-no-print" style={{display:'flex', gap:0, borderBottom:`1.5px solid ${type.color}`}}>
+        {[{id:'text', label:'⌨️ 타자로'}, {id:'draw', label:'✏️ 손으로'}].map(m => (
+          <button key={m.id} onClick={()=>setInputMode(m.id)} style={{
+            fontFamily:'Jua', fontSize:13, padding:'5px 14px', border:'none', cursor:'pointer',
+            background: inputMode===m.id ? type.color : 'transparent',
+            color: inputMode===m.id ? '#fff' : type.color,
+            borderRadius:'4px 4px 0 0',
+          }}>{m.label}</button>
+        ))}
       </div>
-      <div className="qc-no-print" style={{display:'flex', gap:8}}>
-        <button onClick={onExample} style={{
-          background:'transparent', border:`1.5px solid ${type.color}`, padding:'9px 14px',
-          fontSize:13, cursor:'pointer', color:type.color, fontFamily:'Jua',
-        }}>힌트 💡</button>
-        <button onClick={onAdd} style={{
-          flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
-          color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
-          boxShadow:`2px 2px 0 #3C2F2A`, opacity: over ? 0.5 : 1,
-        }}>✂️ 오려서 붙이기</button>
-      </div>
+
+      {inputMode === 'text' ? (
+        <>
+          <div style={{position:'relative'}}>
+            <textarea value={value} onChange={e=>onChange(e.target.value)}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
+              placeholder={type.placeholder}
+              className="qc-no-print"
+              style={{
+                fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over ? '#D63384' : type.color}`,
+                padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
+                background: over ? '#fff0f6' : '#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
+              }}/>
+            <span className="qc-no-print" style={{
+              position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
+              color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
+            }}>{value.length}/{V2_MAX_CHARS}</span>
+          </div>
+          <div className="qc-no-print" style={{display:'flex', gap:8}}>
+            <button onClick={onExample} style={{
+              background:'transparent', border:`1.5px solid ${type.color}`, padding:'9px 14px',
+              fontSize:13, cursor:'pointer', color:type.color, fontFamily:'Jua',
+            }}>힌트 💡</button>
+            <button onClick={onAdd} style={{
+              flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
+              color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
+              boxShadow:`2px 2px 0 #3C2F2A`, opacity: over ? 0.5 : 1,
+            }}>✂️ 오려서 붙이기</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="qc-no-print">
+            <V2DrawCanvas ref={drawCanvasRef} bgColor={type.paper} penColor="#3C2F2A" />
+          </div>
+          <div className="qc-no-print">
+            <button onClick={()=>onAddDraw(drawCanvasRef)} style={{
+              width:'100%', fontFamily:'Jua', padding:'10px 14px', border:'none',
+              color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
+              boxShadow:`2px 2px 0 #3C2F2A`,
+            }}>✂️ 오려서 붙이기</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -452,17 +609,26 @@ function V2Note({note, type, onDel, onUpdate}){
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
   const taRef = React.useRef(null);
+  const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
+  const isDrawNote = !!note.drawData;
 
   const openEdit = () => {
     setDraft(note.text);
     setDraftType(note.type);
     setEditing(true);
-    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+    if (!isDrawNote) setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
   };
   const save = () => {
-    const t = draft.trim();
-    if(t) onUpdate({text:t, type:draftType});
+    if (isDrawNote) {
+      const newData = editDrawRef.current?.isDirty()
+        ? editDrawRef.current.getDataURL()
+        : note.drawData;
+      onUpdate({text:'', type:draftType, drawData:newData});
+    } else {
+      const t = draft.trim();
+      if(t) onUpdate({text:t, type:draftType, drawData:null});
+    }
     setEditing(false);
   };
   const cancel = () => setEditing(false);
@@ -478,7 +644,7 @@ function V2Note({note, type, onDel, onUpdate}){
   if(editing){
     return (
       <div className="qc-no-print" style={{
-        position:'relative', width:210, padding:'12px 14px',
+        position:'relative', width: isDrawNote ? 310 : 210, padding:'12px 14px',
         background:'#FFF8ED', border:`2px solid ${type.color}`,
         boxShadow:'4px 4px 0 rgba(60,47,42,.3)',
         display:'flex', flexDirection:'column', gap:8,
@@ -495,15 +661,19 @@ function V2Note({note, type, onDel, onUpdate}){
             }}>{t.sub}</button>
           ))}
         </div>
-        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
-          onCompositionStart={()=>{ composing.current=true; }}
-          onCompositionEnd={()=>{ composing.current=false; }}
-          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
-          style={{
-            fontFamily:'Gamja Flower', fontSize:18, border:`1.5px solid ${curType ? curType.color : '#ccc'}`,
-            padding:'8px 10px', resize:'none', outline:'none', minHeight:70,
-            boxSizing:'border-box', width:'100%', background:'#fffcf5',
-          }}/>
+        {isDrawNote ? (
+          <V2DrawCanvas ref={editDrawRef} bgColor={curType ? curType.paper : '#FFF8ED'} penColor="#3C2F2A" initialDataURL={note.drawData} />
+        ) : (
+          <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+            style={{
+              fontFamily:'Gamja Flower', fontSize:18, border:`1.5px solid ${curType ? curType.color : '#ccc'}`,
+              padding:'8px 10px', resize:'none', outline:'none', minHeight:70,
+              boxSizing:'border-box', width:'100%', background:'#fffcf5',
+            }}/>
+        )}
         <div style={{display:'flex', gap:6}}>
           <button onClick={save} style={{
             flex:1, fontFamily:'Jua', fontSize:13, padding:'7px 0',
@@ -524,9 +694,7 @@ function V2Note({note, type, onDel, onUpdate}){
   }
 
   return (
-    <div style={{
-      position:'relative', width:190,
-    }}>
+    <div style={{ position:'relative', width:190 }}>
       <div style={{
         background:type.paper, padding:'14px 16px 30px', minHeight:140,
         fontFamily:'Gamja Flower', fontSize:19, lineHeight:1.35, color:'#3C2F2A',
@@ -539,7 +707,11 @@ function V2Note({note, type, onDel, onUpdate}){
           display:'inline-block', fontFamily:'Jua', fontSize:10, letterSpacing:2,
           padding:'2px 8px', color:type.color, border:`1px solid ${type.color}`, marginBottom:8,
         }}>{type.sub}</span>
-        <div>{note.text}</div>
+        {note.drawData
+          ? <img src={note.drawData} alt="손글씨 질문"
+              style={{display:'block', width:'100%', height:'auto', borderRadius:2, marginTop:4}}/>
+          : <div>{note.text}</div>
+        }
         <button onClick={openEdit} className="qc-no-print" style={{
           position:'absolute', bottom:6, left:8, border:'none', background:'transparent',
           fontSize:13, cursor:'pointer', color:'#8A6F5E',
@@ -569,8 +741,8 @@ function V2Btn({children, bg, icon, onClick}){
       boxShadow: h ? '5px 5px 0 #3C2F2A' : '3px 3px 0 #3C2F2A',
       transform: h ? 'translate(-2px,-2px)' : 'none', transition:'all .15s',
     }}>
-      <span>{icon}</span>{children}
-    </button>;
+    <span>{icon}</span>{children}
+  </button>;
 }
 
 Object.assign(window, { V2 });
