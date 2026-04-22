@@ -1,6 +1,3 @@
-// V2 — Riso/scrapbook paper-craft. Cut-paper cards, washi tape, stamps, grid
-// paper, dotted underlines. Palette is warmer and more desaturated than V1.
-
 const V2_TYPES = [
   { key:'fact',    label:'사실',   sub:'FACT',    hint:'무엇일까?',       placeholder:'무엇을 물어보고 싶어요?',   color:'#4A7FB8', wash:'#FFE8A3', paper:'#E4EEF7' },
   { key:'think',   label:'생각',   sub:'THINK',   hint:'왜 ~~~~?',        placeholder:'왜 그랬을지 궁금해요?',     color:'#D4902A', wash:'#FFC9B8', paper:'#FCEFD0' },
@@ -20,8 +17,8 @@ const V2_EXAMPLES = (c) => {
 };
 
 const V2_STORAGE_KEY = 'qc-v2-state';
+const V2_MAX_CHARS = 120;
 
-// SVG icon for each type, drawn in a hand-cut style
 const V2Icon = ({type, size=36}) => {
   const c = type.color;
   if(type.key==='fact') return (
@@ -50,7 +47,6 @@ const V2Icon = ({type, size=36}) => {
   );
 };
 
-// Washi tape piece
 const V2Tape = ({color='#FFE8A3', rotate=-4, width=80, top=-10, left=20, pattern='stripe'}) => (
   <div style={{
     position:'absolute', top, left, width, height:22, transform:`rotate(${rotate}deg)`,
@@ -94,6 +90,7 @@ function V2({width=1100, height=1400}){
   const [hydrated, setHydrated] = React.useState(false);
   const idRef = React.useRef(1);
   const toastTimer = React.useRef(null);
+  const undoStack = React.useRef([]);
 
   React.useEffect(() => {
     try {
@@ -101,13 +98,16 @@ function V2({width=1100, height=1400}){
       if (raw) {
         const s = JSON.parse(raw);
         if (Array.isArray(s.notes)) setNotes(s.notes);
-        if (typeof s.name === 'string') setName(s.name);
-        if (typeof s.classInfo === 'string') setClassInfo(s.classInfo);
         if (typeof s.char1 === 'string') setChar1(s.char1);
         if (typeof s.char2 === 'string') setChar2(s.char2);
         if (typeof s.situation === 'string') setSituation(s.situation);
         if (Number.isFinite(s.nextId)) idRef.current = s.nextId;
       }
+      // 이름/학년반은 sessionStorage에서만 복원 (탭 닫으면 자동 삭제)
+      const sName = sessionStorage.getItem('qc-v2-name');
+      const sClass = sessionStorage.getItem('qc-v2-class');
+      if (sName) setName(sName);
+      if (sClass) setClassInfo(sClass);
     } catch {}
     setHydrated(true);
   }, []);
@@ -115,9 +115,13 @@ function V2({width=1100, height=1400}){
   React.useEffect(() => {
     if (!hydrated) return;
     try {
+      // 질문/설정(수업 콘텐츠)만 localStorage에 저장
       localStorage.setItem(V2_STORAGE_KEY, JSON.stringify({
-        notes, name, classInfo, char1, char2, situation, nextId: idRef.current,
+        notes, char1, char2, situation, nextId: idRef.current,
       }));
+      // 이름/학년반은 sessionStorage에만 저장
+      sessionStorage.setItem('qc-v2-name', name);
+      sessionStorage.setItem('qc-v2-class', classInfo);
     } catch {}
   }, [hydrated, notes, name, classInfo, char1, char2, situation]);
 
@@ -130,6 +134,7 @@ function V2({width=1100, height=1400}){
   const addNote = (type) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요'); return; }
+    if(text.length > V2_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V2_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
     setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*12-6).toFixed(1)}]);
     setInputs(i => ({...i, [type]:''}));
     showToast('도화지에 붙였어요!');
@@ -137,28 +142,59 @@ function V2({width=1100, height=1400}){
   const delNote = (id) => {
     const found = notes.find(n=>n.id===id);
     if(!found) return;
+    undoStack.current.push(found);
     setNotes(n=>n.filter(x=>x.id!==id));
-    showToast('오렸던 걸 뗐어요', { label:'되돌리기', onClick: () => {
-      setNotes(n => n.some(x=>x.id===found.id) ? n : [...n, found]);
+    showToast('오렸던 걸 뗐어요 (Ctrl+Z로 되돌리기)', { label:'되돌리기', onClick: () => {
+      const last = undoStack.current.pop();
+      if(last) setNotes(n => n.some(x=>x.id===last.id) ? n : [...n, last]);
       setToast(null);
       clearTimeout(toastTimer.current);
     }});
   };
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if(!(e.ctrlKey || e.metaKey) || e.key !== 'z') return;
+      const tag = document.activeElement?.tagName;
+      if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      const last = undoStack.current.pop();
+      if(last){
+        setNotes(n => n.some(x=>x.id===last.id) ? n : [...n, last]);
+        showToast('되돌렸어요! ↩️');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const exampleFor = (type) => {
     const arr = V2_EXAMPLES({char1, char2})[type];
     setInputs(i => ({...i, [type]: arr[Math.floor(Math.random()*arr.length)]}));
   };
   const clearAll = () => {
-    if(notes.length && confirm('모두 지울까요?')){
-      setNotes([]); idRef.current = 1;
-      try { localStorage.removeItem(V2_STORAGE_KEY); } catch {}
-    }
+    if(!notes.length) return;
+    showToast('정말 모두 지울까요?', {
+      label: '네, 지워요 🗑️',
+      onClick: () => {
+        const backup = [...notes];
+        undoStack.current.push(...backup);
+        setNotes([]); idRef.current = 1;
+        try {
+          localStorage.removeItem(V2_STORAGE_KEY);
+          sessionStorage.removeItem('qc-v2-name');
+          sessionStorage.removeItem('qc-v2-class');
+        } catch {}
+        setToast(null);
+        clearTimeout(toastTimer.current);
+        showToast('모두 지웠어요 (Ctrl+Z로 되돌리기)');
+      },
+    });
   };
 
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V2_TYPES.every(t => counts[t.key] >= 1);
 
-  // Risograph grain texture
   const grain = `url("data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.25 0 0 0 0 0.2 0 0 0 0.18 0'/></filter><rect width='200' height='200' filter='url(#n)'/></svg>`
   )}")`;
@@ -322,6 +358,8 @@ function V2Input({label, value, onChange}){
 
 function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
   const [h, setH] = React.useState(false);
+  const composing = React.useRef(false);
+  const over = value.length > V2_MAX_CHARS;
   const rotations = [-1.2, 1, -0.6, 1.5];
   const tapeColors = ['#FFE8A3', '#FFC9B8', '#C6E3CF', '#E1D9EF'];
   const tapePatterns = ['stripe', 'dot', 'plain', 'stripe'];
@@ -338,7 +376,6 @@ function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
 
       <V2Tape color={tapeColors[idx]} rotate={-8 + idx*5} width={90} top={-10} left={30} pattern={tapePatterns[idx]}/>
 
-      {/* stamp-like sub label */}
       <div style={{position:'absolute', top:14, right:14,
         fontFamily:'Jua', fontSize:11, letterSpacing:2, color:type.color,
         border:`1.5px solid ${type.color}`, padding:'3px 8px', transform:'rotate(4deg)',
@@ -364,24 +401,32 @@ function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
         padding:'6px 0', borderBottom:`2px dashed ${type.color}`,
       }}>“ {type.hint} ”</div>
 
-      <textarea value={value} onChange={e=>onChange(e.target.value)}
-        onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !e.nativeEvent.isComposing){ e.preventDefault(); onAdd(); } }}
-        placeholder={type.placeholder}
-        className="qc-no-print"
-        style={{
-          fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${type.color}`,
-          padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
-          background:'#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
-        }}/>
+      <div style={{position:'relative'}}>
+        <textarea value={value} onChange={e=>onChange(e.target.value)}
+          onCompositionStart={()=>{ composing.current=true; }}
+          onCompositionEnd={()=>{ composing.current=false; }}
+          onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
+          placeholder={type.placeholder}
+          className="qc-no-print"
+          style={{
+            fontFamily:'Gaegu', fontSize:20, border:`1.5px solid ${over ? '#D63384' : type.color}`,
+            padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
+            background: over ? '#fff0f6' : '#FFFBF0', boxSizing:'border-box', color:'#3C2F2A',
+          }}/>
+        <span className="qc-no-print" style={{
+          position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:11,
+          color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
+        }}>{value.length}/{V2_MAX_CHARS}</span>
+      </div>
       <div className="qc-no-print" style={{display:'flex', gap:8}}>
         <button onClick={onExample} style={{
           background:'transparent', border:`1.5px solid ${type.color}`, padding:'9px 14px',
           fontSize:13, cursor:'pointer', color:type.color, fontFamily:'Jua',
-        }}>예시 💡</button>
+        }}>힌트 💡</button>
         <button onClick={onAdd} style={{
           flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none',
           color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
-          boxShadow:`2px 2px 0 #3C2F2A`,
+          boxShadow:`2px 2px 0 #3C2F2A`, opacity: over ? 0.5 : 1,
         }}>✂️ 오려서 붙이기</button>
       </div>
     </div>
@@ -389,7 +434,6 @@ function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
 }
 
 function V2Note({note, type, onDel}){
-  // Slightly torn rectangle via clip-path variations
   const clips = [
     'polygon(3% 4%,97% 2%,100% 95%,2% 97%)',
     'polygon(0 4%,98% 0,100% 97%,4% 100%)',
@@ -418,7 +462,6 @@ function V2Note({note, type, onDel}){
           fontSize:14, cursor:'pointer', color:'#8A6F5E',
         }}>✕</button>
       </div>
-      {/* tape */}
       <div style={{
         position:'absolute', top:-6, left:'50%', transform:`translateX(-50%) rotate(${Number(note.tilt)}deg)`,
         width:50, height:16, background:`repeating-linear-gradient(45deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px), ${type.wash}`,

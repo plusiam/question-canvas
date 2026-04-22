@@ -1,7 +1,3 @@
-// V3 — Speech-bubble playground. Each question type is a chubby cartoon
-// character bubble with eyes; the 'board' is a playground sky where bubbles
-// float and huddle. Most playful of the three.
-
 const V3_TYPES = [
   { key:'fact',    label:'사실',  icon:'🔍', placeholder:'무엇이 궁금해요?',
     prompt:'무엇 · 언제 · 누가 · 어디서', color:'#3FA9F5', deep:'#1E6FB8',
@@ -29,8 +25,8 @@ const V3_EXAMPLES = (c) => {
 };
 
 const V3_STORAGE_KEY = 'qc-v3-state';
+const V3_MAX_CHARS = 120;
 
-// Cute bubble character face
 function V3Face({type, size=70, talking=false}){
   const eye = type.eyeStyle;
   const mouthPath = {
@@ -90,6 +86,7 @@ function V3({width=1100, height=1400}){
   const [hydrated, setHydrated] = React.useState(false);
   const idRef = React.useRef(1);
   const toastTimer = React.useRef(null);
+  const undoStack = React.useRef([]);
 
   React.useEffect(() => {
     try {
@@ -97,13 +94,16 @@ function V3({width=1100, height=1400}){
       if (raw) {
         const s = JSON.parse(raw);
         if (Array.isArray(s.notes)) setNotes(s.notes);
-        if (typeof s.name === 'string') setName(s.name);
-        if (typeof s.classInfo === 'string') setClassInfo(s.classInfo);
         if (typeof s.char1 === 'string') setChar1(s.char1);
         if (typeof s.char2 === 'string') setChar2(s.char2);
         if (typeof s.situation === 'string') setSituation(s.situation);
         if (Number.isFinite(s.nextId)) idRef.current = s.nextId;
       }
+      // 이름/학년반은 sessionStorage에서만 복원 (탭 닫으면 자동 삭제)
+      const sName = sessionStorage.getItem('qc-v3-name');
+      const sClass = sessionStorage.getItem('qc-v3-class');
+      if (sName) setName(sName);
+      if (sClass) setClassInfo(sClass);
     } catch {}
     setHydrated(true);
   }, []);
@@ -111,9 +111,13 @@ function V3({width=1100, height=1400}){
   React.useEffect(() => {
     if (!hydrated) return;
     try {
+      // 질문/설정(수업 콘텐츠)만 localStorage에 저장
       localStorage.setItem(V3_STORAGE_KEY, JSON.stringify({
-        notes, name, classInfo, char1, char2, situation, nextId: idRef.current,
+        notes, char1, char2, situation, nextId: idRef.current,
       }));
+      // 이름/학년반은 sessionStorage에만 저장
+      sessionStorage.setItem('qc-v3-name', name);
+      sessionStorage.setItem('qc-v3-class', classInfo);
     } catch {}
   }, [hydrated, notes, name, classInfo, char1, char2, situation]);
 
@@ -126,6 +130,7 @@ function V3({width=1100, height=1400}){
   const addNote = (type) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
+    if(text.length > V3_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V3_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
     setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1)}]);
     setInputs(i => ({...i, [type]:''}));
     showToast('질문이 떠올랐어요! 🎈');
@@ -133,22 +138,54 @@ function V3({width=1100, height=1400}){
   const delNote = (id) => {
     const found = notes.find(n=>n.id===id);
     if(!found) return;
+    undoStack.current.push(found);
     setNotes(n=>n.filter(x=>x.id!==id));
-    showToast('풍선이 사라졌어요', { label:'되돌리기', onClick: () => {
-      setNotes(n => n.some(x=>x.id===found.id) ? n : [...n, found]);
+    showToast('풍선이 사라졌어요 (Ctrl+Z로 되돌리기)', { label:'되돌리기', onClick: () => {
+      const last = undoStack.current.pop();
+      if(last) setNotes(n => n.some(x=>x.id===last.id) ? n : [...n, last]);
       setToast(null);
       clearTimeout(toastTimer.current);
     }});
   };
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if(!(e.ctrlKey || e.metaKey) || e.key !== 'z') return;
+      const tag = document.activeElement?.tagName;
+      if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      const last = undoStack.current.pop();
+      if(last){
+        setNotes(n => n.some(x=>x.id===last.id) ? n : [...n, last]);
+        showToast('되돌렸어요! ↩️');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const exampleFor = (type) => {
     const arr = V3_EXAMPLES({char1, char2})[type];
     setInputs(i => ({...i, [type]: arr[Math.floor(Math.random()*arr.length)]}));
   };
   const clearAll = () => {
-    if(notes.length && confirm('모두 지울까요?')){
-      setNotes([]); idRef.current = 1;
-      try { localStorage.removeItem(V3_STORAGE_KEY); } catch {}
-    }
+    if(!notes.length) return;
+    showToast('정말 모두 지울까요?', {
+      label: '네, 지워요 🗑️',
+      onClick: () => {
+        const backup = [...notes];
+        undoStack.current.push(...backup);
+        setNotes([]); idRef.current = 1;
+        try {
+          localStorage.removeItem(V3_STORAGE_KEY);
+          sessionStorage.removeItem('qc-v3-name');
+          sessionStorage.removeItem('qc-v3-class');
+        } catch {}
+        setToast(null);
+        clearTimeout(toastTimer.current);
+        showToast('모두 지웠어요 (Ctrl+Z로 되돌리기)');
+      },
+    });
   };
 
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
@@ -304,6 +341,8 @@ function V3({width=1100, height=1400}){
 
 function V3Character({type, idx, value, onChange, onAdd, onExample, count, focused, onFocus, onBlur}){
   const [hover, setHover] = React.useState(false);
+  const composing = React.useRef(false);
+  const over = value.length > V3_MAX_CHARS;
   const lean = [-2, 1.5, -1, 2][idx];
   const talking = focused || value.length > 0;
   return (
@@ -345,17 +384,24 @@ function V3Character({type, idx, value, onChange, onAdd, onExample, count, focus
           </div>
         </div>
 
-        {/* input */}
-        <textarea value={value} onChange={e=>onChange(e.target.value)}
-          onFocus={onFocus} onBlur={onBlur}
-          onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !e.nativeEvent.isComposing){ e.preventDefault(); onAdd(); } }}
-          placeholder={type.placeholder}
-          className="qc-no-print"
-          style={{
-            fontFamily:'Gaegu', fontSize:17, border:'2px solid #2d2a26', borderRadius:14,
-            padding:'8px 10px', resize:'none', outline:'none', width:'100%', minHeight:60,
-            background:'#fff', boxSizing:'border-box', color:'#2d2a26',
-          }}/>
+        <div style={{position:'relative'}}>
+          <textarea value={value} onChange={e=>onChange(e.target.value)}
+            onFocus={onFocus} onBlur={onBlur}
+            onCompositionStart={()=>{ composing.current=true; }}
+            onCompositionEnd={()=>{ composing.current=false; }}
+            onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && !composing.current){ e.preventDefault(); onAdd(); } }}
+            placeholder={type.placeholder}
+            className="qc-no-print"
+            style={{
+              fontFamily:'Gaegu', fontSize:17, border:`2px solid ${over ? '#D63384' : '#2d2a26'}`, borderRadius:14,
+              padding:'8px 10px', resize:'none', outline:'none', width:'100%', minHeight:60,
+              background: over ? '#fff0f6' : '#fff', boxSizing:'border-box', color:'#2d2a26',
+            }}/>
+          <span className="qc-no-print" style={{
+            position:'absolute', bottom:6, right:8, fontFamily:'Noto Sans KR', fontSize:10,
+            color: over ? '#D63384' : '#aaa', fontWeight: over ? 700 : 400,
+          }}>{value.length}/{V3_MAX_CHARS}</span>
+        </div>
 
         <div className="qc-no-print" style={{display:'flex', gap:6, marginTop:8}}>
           <button onClick={onExample} style={{
@@ -365,7 +411,7 @@ function V3Character({type, idx, value, onChange, onAdd, onExample, count, focus
           <button onClick={onAdd} style={{
             flex:1, fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
             color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
-            boxShadow:'2px 2px 0 #2d2a26',
+            boxShadow:'2px 2px 0 #2d2a26', opacity: over ? 0.5 : 1,
           }}>🎈 띄우기</button>
         </div>
       </div>
