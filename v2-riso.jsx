@@ -338,12 +338,12 @@ function V2({width=1100, height=1400}){
   )}")`;
 
   return (
-    <div style={{
+    <div className="v2-root" style={{
       width, minHeight:height, position:'relative',
       fontFamily:"'Noto Sans KR', sans-serif", color:'#3C2F2A',
       background:'#F4EBD9', padding:'40px 44px 60px', boxSizing:'border-box',
     }}>
-      <div style={{position:'absolute', inset:0, backgroundImage:grain, pointerEvents:'none', mixBlendMode:'multiply', opacity:.35}} />
+      <div className="v2-grain" style={{position:'absolute', inset:0, backgroundImage:grain, pointerEvents:'none', mixBlendMode:'multiply', opacity:.35}} />
 
       {/* Header */}
       <div style={{position:'relative', padding:'24px 30px', background:'#FFF8ED',
@@ -396,7 +396,7 @@ function V2({width=1100, height=1400}){
       </div>
 
       {/* 4 cards */}
-      <div style={{marginTop:28, display:'grid', gridTemplateColumns:'1fr 1fr', gap:22}}>
+      <div className="v2-cards qc-no-print" style={{marginTop:28, display:'grid', gridTemplateColumns:'1fr 1fr', gap:22}}>
         {V2_TYPES.map((t,i) => (
           <V2TypeCard key={t.key} type={t} idx={i}
             value={inputs[t.key]}
@@ -434,7 +434,7 @@ function V2({width=1100, height=1400}){
           </div>
         </div>
 
-        <div style={{
+        <div className="v2-board-inner" style={{
           position:'relative', background:'#FFF8ED',
           border:'2px solid #3C2F2A', padding:'30px 26px', minHeight:320,
           backgroundImage:`radial-gradient(circle, rgba(60,47,42,.12) 1px, transparent 1.5px)`,
@@ -464,7 +464,56 @@ function V2({width=1100, height=1400}){
       </div>
 
       {toast && <V2Toast toast={toast} />}
-      <style>{`@media print{.qc-no-print{display:none !important}}`}</style>
+      <style>{`
+        @media print {
+          .qc-no-print { display: none !important; }
+
+          /* 전체 페이지 여백 제거 */
+          @page { margin: 12mm 10mm; size: A4 portrait; }
+          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+
+          /* 최상위 컨테이너: A4 전체 너비로 */
+          .v2-root {
+            width: 100% !important;
+            min-height: unset !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+
+          /* 그레인 오버레이 숨김 */
+          .v2-grain { display: none !important; }
+
+          /* 입력 카드 4개 숨김 */
+          .v2-cards { display: none !important; }
+
+          /* 도화지 영역: flex → block, 포스트잇이 자연스럽게 흘러내림 */
+          .v2-board-inner {
+            display: block !important;
+            column-count: 3 !important;
+            column-gap: 14px !important;
+            padding: 16px 12px !important;
+            min-height: unset !important;
+            box-shadow: none !important;
+            border: 1.5px solid #3C2F2A !important;
+            background: #fff !important;
+          }
+
+          /* 각 포스트잇: 페이지 경계에서 절대 잘리지 않음 */
+          .v2-note-wrap {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            display: inline-block !important;
+            width: 100% !important;
+            margin-bottom: 12px !important;
+          }
+
+          /* 포스트잇 내부: 회전 제거, 그림자 단순화 */
+          .v2-note-inner {
+            transform: none !important;
+            box-shadow: 2px 2px 4px rgba(60,47,42,.12) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -741,8 +790,8 @@ function V2Note({note, type, onDel, onUpdate}){
   }
 
   return (
-    <div style={{ position:'relative', width: sz.width }}>
-      <div style={{
+    <div className="v2-note-wrap" style={{ position:'relative', width: sz.width }}>
+      <div className="v2-note-inner" style={{
         background: type.paper, padding:'14px 16px 30px', minHeight: sz.minHeight,
         fontFamily:'Gamja Flower', fontSize: sz.fontSize, lineHeight:1.35,
         color: note.penColor && !isDrawNote ? note.penColor : '#3C2F2A',
@@ -766,7 +815,7 @@ function V2Note({note, type, onDel, onUpdate}){
           position:'absolute', bottom:6, right:8, border:'none', background:'transparent',
           fontSize:14, cursor:'pointer', color:'#8A6F5E'}}>✕</button>
       </div>
-      <div style={{
+      <div className="qc-no-print" style={{
         position:'absolute', top:-6, left:'50%', transform:`translateX(-50%) rotate(${Number(note.tilt)}deg)`,
         width:50, height:16, background:`repeating-linear-gradient(45deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px), ${type.wash}`,
         boxShadow:'0 1px 2px rgba(0,0,0,.12)', opacity:.95,
