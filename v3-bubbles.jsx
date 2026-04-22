@@ -388,6 +388,8 @@ function V3({width=1100, height=1400}){
     });
   };
 
+  const [drawingKey, setDrawingKey] = React.useState(null);
+
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V3_TYPES.every(t => counts[t.key] >= 1);
 
@@ -475,6 +477,8 @@ function V3({width=1100, height=1400}){
             focused={focused===t.key}
             onFocus={()=>setFocused(t.key)}
             onBlur={()=>setFocused(null)}
+            isDrawMode={drawingKey===t.key}
+            onSetDrawMode={key=>setDrawingKey(key)}
           />
         ))}
       </div>
@@ -637,7 +641,7 @@ function V3({width=1100, height=1400}){
   );
 }
 
-function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur}){
+function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur, isDrawMode, onSetDrawMode}){
   const [hover, setHover] = React.useState(false);
   const [inputMode, setInputMode] = React.useState('text');
   const [noteSize, setNoteSize] = React.useState('M');
@@ -647,6 +651,10 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
   const over = value.length > V3_MAX_CHARS;
   const lean = [-2, 1.5, -1, 2][idx];
   const talking = focused || value.length > 0;
+
+  React.useEffect(() => {
+    if (!isDrawMode && inputMode === 'draw') setInputMode('text');
+  }, [isDrawMode]);
 
   return (
     <div style={{
@@ -687,7 +695,7 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
         {/* 입력 모드 탭 */}
         <div className="qc-no-print" style={{display:'flex', gap:4, marginBottom:8, justifyContent:'center'}}>
           {[{id:'text', label:'⌨️'}, {id:'draw', label:'✏️'}].map(m => (
-            <button key={m.id} onClick={()=>setInputMode(m.id)} style={{
+            <button key={m.id} onClick={()=>{ setInputMode(m.id); onSetDrawMode(m.id==='draw' ? type.key : null); }} style={{
               fontFamily:'Jua', fontSize:12, padding:'4px 12px', borderRadius:999,
               border:'2px solid #2d2a26',
               background: inputMode===m.id ? '#2d2a26' : 'rgba(255,255,255,.8)',
