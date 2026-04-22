@@ -346,7 +346,7 @@ function V2({width=1100, height=1400}){
       <div className="v2-grain" style={{position:'absolute', inset:0, backgroundImage:grain, pointerEvents:'none', mixBlendMode:'multiply', opacity:.35}} />
 
       {/* Header */}
-      <div style={{position:'relative', padding:'24px 30px', background:'#FFF8ED',
+      <div className="v2-header" style={{position:'relative', padding:'24px 30px', background:'#FFF8ED',
         boxShadow:'0 4px 0 rgba(60,47,42,.15), 6px 10px 24px rgba(60,47,42,.12)',
         clipPath:'polygon(0 6%, 2% 0, 14% 4%, 28% 1%, 46% 5%, 66% 1%, 82% 4%, 98% 0, 100% 7%, 99% 94%, 97% 100%, 80% 96%, 58% 99%, 34% 96%, 16% 100%, 2% 97%, 1% 100%, 0 94%)',
       }}>
@@ -377,7 +377,7 @@ function V2({width=1100, height=1400}){
       </div>
 
       {/* Story strip */}
-      <div style={{marginTop:24, position:'relative', background:'#FFF8ED',
+      <div className="v2-story" style={{marginTop:24, position:'relative', background:'#FFF8ED',
         padding:'18px 24px', border:'1.5px solid #3C2F2A',
         backgroundImage:`repeating-linear-gradient(0deg, transparent 0 28px, rgba(60,47,42,.08) 28px 29px),
                          repeating-linear-gradient(90deg, transparent 0 28px, rgba(60,47,42,.06) 28px 29px)`,
@@ -459,14 +459,14 @@ function V2({width=1100, height=1400}){
         <V2Btn bg="#C6E3CF" icon="🖨️" onClick={()=>window.print()}>도화지 인쇄</V2Btn>
         <V2Btn bg="#FFC9B8" icon="🗑️" onClick={clearAll}>모두 지우기</V2Btn>
       </div>
-      <div style={{textAlign:'center', marginTop:30, color:'#8A6F5E', fontSize:13, fontFamily:'Gaegu'}}>
+      <div className="v2-copyright" style={{textAlign:'center', marginTop:30, color:'#8A6F5E', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 질문 공방 · 룰루랄라 한기쌤
       </div>
 
       {toast && <V2Toast toast={toast} />}
       <style>{`
         @media print {
-          @page { margin: 14mm 12mm; size: A4 portrait; }
+          @page { margin: 10mm 10mm; size: A4 portrait; }
 
           .qc-no-print { display: none !important; }
 
@@ -476,25 +476,54 @@ function V2({width=1100, height=1400}){
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
 
-          /* 최상위 컨테이너: 높이 제한 없이 페이지 자유롭게 넘어감 */
+          /* 최상위 컨테이너 */
           .v2-root {
             width: 100% !important;
             min-height: unset !important;
-            padding: 16px 20px 24px !important;
+            padding: 4mm 4mm 4mm !important;
             background: #F4EBD9 !important;
           }
 
           .v2-grain { display: none !important; }
           .v2-cards { display: none !important; }
-          .v2-board-header { margin-bottom: 10px !important; }
 
-          /* 도화지: flex wrap, 페이지 자유롭게 넘어감 */
+          /* 헤더: 패딩·폰트 축소 */
+          .v2-header {
+            padding: 8px 16px 10px !important;
+            clip-path: none !important;
+            box-shadow: none !important;
+            border: 1px solid #c8a882 !important;
+            margin-bottom: 0 !important;
+          }
+          .v2-header h1 { font-size: 22px !important; margin: 0 !important; }
+          .v2-header p  { font-size: 12px !important; margin: 2px 0 6px !important; }
+
+          /* 이야기 영역: 패딩·마진 축소 */
+          .v2-story {
+            margin-top: 4px !important;
+            padding: 8px 12px !important;
+            box-shadow: none !important;
+            border: 1px solid #3C2F2A !important;
+            background-image: none !important;
+          }
+
+          /* copyright 인쇄 숨김 */
+          .v2-copyright { display: none !important; }
+
+          /* 도화지 헤더 */
+          .v2-board-header {
+            margin-top: 6px !important;
+            margin-bottom: 4px !important;
+          }
+          .v2-board-header h2 { font-size: 18px !important; margin: 0 !important; }
+
+          /* 도화지 내부: flex wrap, 페이지 자유롭게 넘어감 */
           .v2-board-inner {
             display: flex !important;
             flex-wrap: wrap !important;
-            gap: 4mm !important;
+            gap: 3mm !important;
             align-content: flex-start !important;
-            padding: 3mm 3mm !important;
+            padding: 3mm !important;
             min-height: unset !important;
             box-shadow: none !important;
             border: 1.5px solid #3C2F2A !important;
@@ -502,31 +531,31 @@ function V2({width=1100, height=1400}){
             break-inside: auto !important;
           }
 
-          /* 각 포스트잇 wrapper: 잘리지 않음, 3열 고정 너비 */
+          /* 포스트잇 wrapper: 3열, 잘리지 않음 */
           .v2-note-wrap {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             flex-shrink: 0 !important;
             margin: 0 !important;
-            width: calc((100% - 8mm) / 3) !important;
+            width: calc((100% - 6mm) / 3) !important;
           }
 
-          /* 포스트잇 내부: 회전 제거, mm 단위 고정 높이 */
+          /* 포스트잇 내부: 고정 높이 */
           .v2-note-inner {
             transform: none !important;
-            box-shadow: 1px 2px 4px rgba(60,47,42,.15) !important;
+            box-shadow: 1px 2px 3px rgba(60,47,42,.12) !important;
             clip-path: none !important;
             width: 100% !important;
-            min-height: 60mm !important;
-            height: 60mm !important;
+            height: 52mm !important;
+            min-height: 52mm !important;
             overflow: hidden !important;
-            padding: 8px 10px 8px !important;
+            padding: 6px 8px !important;
             box-sizing: border-box !important;
           }
-          /* 손글씨 포스트잇: 이미지 비율 유지 */
+          /* 손글씨 포스트잇 */
           .v2-note-inner.is-draw {
             height: auto !important;
-            min-height: 40mm !important;
+            min-height: 36mm !important;
           }
         }
       `}</style>
