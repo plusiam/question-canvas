@@ -513,11 +513,18 @@ function V2({width=1100, height=1400}){
             margin: 0 0 14px 0 !important;
           }
 
-          /* 포스트잇 내부: 인쇄 시 회전 제거 */
+          /* 포스트잇 내부: 인쇄 시 회전 제거 + 크기 고정 */
           .v2-note-inner {
             transform: none !important;
             box-shadow: 1px 2px 4px rgba(60,47,42,.15) !important;
             clip-path: none !important;
+            min-height: 130px !important;
+            height: 130px !important;
+            overflow: hidden !important;
+          }
+          /* 손글씨(이미지) 포스트잇은 이미지 비율에 맞게 높이 자동 */
+          .v2-note-inner.is-draw {
+            height: auto !important;
           }
         }
       `}</style>
@@ -798,7 +805,7 @@ function V2Note({note, type, onDel, onUpdate}){
 
   return (
     <div className="v2-note-wrap" style={{ position:'relative', width: sz.width }}>
-      <div className="v2-note-inner" style={{
+      <div className={`v2-note-inner${isDrawNote ? ' is-draw' : ''}`} style={{
         background: type.paper, padding:'14px 16px 30px', minHeight: sz.minHeight,
         fontFamily:'Gamja Flower', fontSize: sz.fontSize, lineHeight:1.35,
         color: note.penColor && !isDrawNote ? note.penColor : '#3C2F2A',
