@@ -619,6 +619,10 @@ function V3({width=1100, height=1400}){
             box-sizing:border-box !important;
             width:100% !important;
           }
+          .v3-bubble.is-draw>div{
+            height:auto !important;
+            min-height:36mm !important;
+          }
           .v3-bubble img{
             max-height:36mm !important;
             height:auto !important;
@@ -881,7 +885,7 @@ function V3Bubble({note, type, onDel, onUpdate, onMove}){
   }
 
   return (
-    <div className="v3-bubble"
+    <div className={`v3-bubble${isDrawNote ? ' is-draw' : ''}`}
       onPointerDown={onDragStart}
       onPointerMove={onDragMove}
       onPointerUp={onDragEnd}

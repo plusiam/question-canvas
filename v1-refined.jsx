@@ -583,6 +583,11 @@ function V1({width=1100, height=1400}){
             box-sizing:border-box !important;
             font-size:14px !important;
           }
+          /* 손글씨 포스트잇 */
+          .v1-note.is-draw{
+            height:auto !important;
+            min-height:36mm !important;
+          }
         }
       `}</style>
     </div>
@@ -860,7 +865,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
   }
 
   return (
-    <div className="v1-note"
+    <div className={`v1-note${isDrawNote ? ' is-draw' : ''}`}
       onPointerDown={onDragStart}
       onPointerMove={onDragMove}
       onPointerUp={onDragEnd}
