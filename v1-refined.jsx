@@ -94,12 +94,21 @@ function V1({width=1100, height=1400}){
     toastTimer.current = setTimeout(()=>setToast(null), action ? 4000 : 1800);
   };
 
+  const nextPos = (currentNotes) => {
+    const cols = Math.floor(1008 / (180 + 22));
+    const idx = currentNotes.length;
+    return { x: 28 + (idx % cols) * (180 + 22), y: 28 + Math.floor(idx / cols) * (150 + 22) };
+  };
+
   const addNote = (type) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
     if(text.length > V1_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V1_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
     const tilt = (Math.random()*10 - 5).toFixed(1);
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt}]);
+    setNotes(n => {
+      const pos = nextPos(n);
+      return [...n, {id:idRef.current++, type, text, tilt, x:pos.x, y:pos.y}];
+    });
     setInputs(i => ({...i, [type]:''}));
     showToast('붙였어요! 🎉');
   };
@@ -115,6 +124,10 @@ function V1({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
+  const moveNote = (id, x, y) => {
+    setNotes(n => n.map(note => note.id===id ? {...note, x, y} : note));
+  };
+
   const updateNote = (id, {text, type}) => {
     setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
     showToast('수정했어요 ✏️');
@@ -275,17 +288,17 @@ function V1({width=1100, height=1400}){
         </div>
         <div className="v1-board" style={{
           background:'#fffdf4', border:'3px solid #2d2a26', borderRadius:22,
-          boxShadow:'0 6px 18px rgba(62,48,30,.12)', padding:'28px 24px', minHeight:280,
+          boxShadow:'0 6px 18px rgba(62,48,30,.12)', minHeight:480,
           backgroundImage:'linear-gradient(90deg,rgba(62,48,30,.04) 1px,transparent 1px),linear-gradient(rgba(62,48,30,.04) 1px,transparent 1px)',
           backgroundSize:'24px 24px',
-          display:'flex', flexWrap:'wrap', gap:20, alignContent:'flex-start',
+          position:'relative',
         }}>
           {notes.length===0 ? (
             <div style={{
               fontFamily:'Gaegu', fontSize:24, color:'#7a7064', width:'100%', textAlign:'center', padding:'40px 10px',
             }}>여기에 만든 질문이 포스트잇처럼 붙어요 🎨</div>
           ) : notes.map(n => (
-            <V1Note key={n.id} note={n} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} type={V1_TYPES.find(t=>t.key===n.type)} />
+            <V1Note key={n.id} note={n} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} type={V1_TYPES.find(t=>t.key===n.type)} onMove={(x,y)=>moveNote(n.id,x,y)} />
           ))}
         </div>
       </div>
@@ -509,12 +522,33 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
   );
 }
 
-function V1Note({note, type, onDel, onUpdate}){
+function V1Note({note, type, onDel, onUpdate, onMove}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
+  const [dragging, setDragging] = React.useState(false);
   const taRef = React.useRef(null);
   const composing = React.useRef(false);
+  const dragOffset = React.useRef({x:0, y:0});
+
+  const onDragStart = (e) => {
+    if(editing) return;
+    if(e.target.closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDragging(true);
+  };
+  const onDragMove = (e) => {
+    if(!dragging) return;
+    const board = e.currentTarget.closest('.v1-board');
+    if(!board) return;
+    const boardRect = board.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - boardRect.left - dragOffset.current.x, boardRect.width - 180));
+    const y = Math.max(0, e.clientY - boardRect.top - dragOffset.current.y);
+    onMove(x, y);
+  };
+  const onDragEnd = () => setDragging(false);
 
   const openEdit = () => {
     setDraft(note.text);
@@ -532,6 +566,7 @@ function V1Note({note, type, onDel, onUpdate}){
 
   if(editing){
     return (
+      <div style={{position:'absolute', left: note.x ?? 28, top: note.y ?? 28, zIndex:200}}>
       <div className="v1-note qc-no-print" style={{
         width:200, padding:'12px 14px', borderRadius:10,
         background:'#fff', border:`3px solid ${type.color}`,
@@ -573,18 +608,30 @@ function V1Note({note, type, onDel, onUpdate}){
           }}>삭제</button>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="v1-note" style={{
-      width:180, minHeight:150, padding:'14px 16px 30px',
-      fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize:18, lineHeight:1.35,
-      color:'#2d2a26', boxShadow:'3px 6px 12px rgba(62,48,30,.18)',
-      position:'relative', wordBreak:'keep-all', overflowWrap:'anywhere', borderRadius:2,
-      background:type.soft, transform:`rotate(${note.tilt}deg)`,
-      animation:'v1noteIn .3s ease', overflow:'hidden', cursor:'default',
-    }}>
+    <div className="v1-note"
+      onPointerDown={onDragStart}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
+      style={{
+        position:'absolute',
+        left: note.x ?? 28, top: note.y ?? 28,
+        width:180, minHeight:150, padding:'14px 16px 30px',
+        fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize:18, lineHeight:1.35,
+        color:'#2d2a26', boxShadow: dragging ? '6px 10px 20px rgba(62,48,30,.32)' : '3px 6px 12px rgba(62,48,30,.18)',
+        wordBreak:'keep-all', overflowWrap:'anywhere', borderRadius:2,
+        background:type.soft, transform:`rotate(${note.tilt}deg)${dragging?' scale(1.04)':''}`,
+        animation:'v1noteIn .3s ease', overflow:'hidden',
+        cursor: dragging ? 'grabbing' : 'grab',
+        zIndex: dragging ? 100 : 1,
+        userSelect:'none', touchAction:'none',
+        transition: dragging ? 'none' : 'box-shadow .15s, transform .15s',
+      }}>
       <span style={{
         position:'absolute', top:-6, left:'50%', transform:'translateX(-50%)',
         width:14, height:14, borderRadius:'50%',

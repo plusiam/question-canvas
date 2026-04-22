@@ -297,11 +297,21 @@ function V3({width=1100, height=1400}){
     toastTimer.current = setTimeout(()=>setToast(null), action ? 4000 : 1800);
   };
 
+  const nextPos = (currentNotes, sz) => {
+    const s = V3_SIZES[sz||'M'];
+    const cols = Math.floor(1012 / (s.width + 22));
+    const idx = currentNotes.length;
+    return { x: 24 + (idx % cols) * (s.width + 22), y: 24 + Math.floor(idx / cols) * (s.minHeight + 22) };
+  };
+
   const addNote = (type, size, penColor) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요 ✍️'); return; }
     if(text.length > V3_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V3_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1), drawData:null, size:size||'M', penColor:penColor||'#2d2a26'}]);
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text, tilt:(Math.random()*8-4).toFixed(1), drawData:null, size:size||'M', penColor:penColor||'#2d2a26', x:pos.x, y:pos.y}];
+    });
     setInputs(i => ({...i, [type]:''}));
     showToast('질문이 떠올랐어요! 🎈');
   };
@@ -309,7 +319,10 @@ function V3({width=1100, height=1400}){
   const addDrawNote = (type, canvasRef, size, penColor) => {
     if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
     const drawData = canvasRef.current.getDataURL();
-    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*8-4).toFixed(1), drawData, size:size||'M', penColor:penColor||'#2d2a26'}]);
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*8-4).toFixed(1), drawData, size:size||'M', penColor:penColor||'#2d2a26', x:pos.x, y:pos.y}];
+    });
     canvasRef.current.clear();
     showToast('질문이 떠올랐어요! 🎈');
   };
@@ -326,6 +339,10 @@ function V3({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
+  const moveNote = (id, x, y) => {
+    setNotes(n => n.map(note => note.id===id ? {...note, x, y} : note));
+  };
+
   const updateNote = (id, patch) => {
     setNotes(n => n.map(x => x.id===id ? {...x, ...patch} : x));
     showToast('수정했어요 ✏️');
@@ -489,13 +506,12 @@ function V3({width=1100, height=1400}){
 
         <div className="v3-board-inner" style={{
           position:'relative', background:'linear-gradient(180deg, #E8F5FF 0%, #FFF8E8 100%)',
-          border:'3px solid #2d2a26', borderRadius:24, padding:'28px 22px', minHeight:300,
-          boxShadow:'0 6px 0 #2d2a26',
-          display:'flex', flexWrap:'wrap', gap:18, alignContent:'flex-start', overflow:'hidden',
+          border:'3px solid #2d2a26', borderRadius:24, minHeight:380,
+          boxShadow:'0 6px 0 #2d2a26', overflow:'hidden',
         }}>
-          <div aria-hidden style={{position:'absolute', top:18, right:40, width:70, height:30, background:'#fff', borderRadius:20, opacity:.6}}/>
-          <div aria-hidden style={{position:'absolute', top:26, right:80, width:40, height:20, background:'#fff', borderRadius:14, opacity:.6}}/>
-          <div aria-hidden style={{position:'absolute', bottom:20, left:40, width:60, height:26, background:'#fff', borderRadius:16, opacity:.5}}/>
+          <div aria-hidden style={{position:'absolute', top:18, right:40, width:70, height:30, background:'#fff', borderRadius:20, opacity:.6, pointerEvents:'none'}}/>
+          <div aria-hidden style={{position:'absolute', top:26, right:80, width:40, height:20, background:'#fff', borderRadius:14, opacity:.6, pointerEvents:'none'}}/>
+          <div aria-hidden style={{position:'absolute', bottom:20, left:40, width:60, height:26, background:'#fff', borderRadius:16, opacity:.5, pointerEvents:'none'}}/>
 
           {notes.length===0 ? (
             <div style={{
@@ -504,7 +520,7 @@ function V3({width=1100, height=1400}){
             }}>여기에 질문 풍선이 둥실둥실 떠올라요 🎈✨</div>
           ) : notes.map(n => {
             const t = V3_TYPES.find(x=>x.key===n.type);
-            return <V3Bubble key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} />;
+            return <V3Bubble key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} onMove={(x,y)=>moveNote(n.id,x,y)} />;
           })}
         </div>
       </div>
@@ -741,15 +757,37 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
   );
 }
 
-function V3Bubble({note, type, onDel, onUpdate}){
+function V3Bubble({note, type, onDel, onUpdate, onMove}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
   const [draftSize, setDraftSize] = React.useState(note.size||'M');
+  const [dragging, setDragging] = React.useState(false);
   const taRef = React.useRef(null);
   const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
+  const dragOffset = React.useRef({x:0, y:0});
   const isDrawNote = !!note.drawData;
+
+  const onDragStart = (e) => {
+    if(editing) return;
+    if(e.target.closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDragging(true);
+  };
+  const onDragMove = (e) => {
+    if(!dragging) return;
+    const board = e.currentTarget.closest('.v3-board-inner');
+    if(!board) return;
+    const boardRect = board.getBoundingClientRect();
+    const sz = V3_SIZES[note.size||'M'];
+    const x = Math.max(0, Math.min(e.clientX - boardRect.left - dragOffset.current.x, boardRect.width - sz.width));
+    const y = Math.max(0, e.clientY - boardRect.top - dragOffset.current.y);
+    onMove(x, y);
+  };
+  const onDragEnd = () => setDragging(false);
 
   const sz = V3_SIZES[note.size||'M'];
 
@@ -777,6 +815,7 @@ function V3Bubble({note, type, onDel, onUpdate}){
 
   if(editing){
     return (
+      <div style={{position:'absolute', left: note.x ?? 24, top: note.y ?? 24, zIndex:200}}>
       <div className="qc-no-print" style={{
         position:'relative', width: isDrawNote ? 320 : 220,
         background:'#fff', border:`3px solid ${type.color}`,
@@ -837,22 +876,35 @@ function V3Bubble({note, type, onDel, onUpdate}){
           }}>삭제</button>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="v3-bubble" style={{
-      position:'relative', width: isDrawNote ? sz.width : sz.width,
-      animation:'v3bubblein .35s cubic-bezier(.3,1.4,.5,1)',
-    }}>
+    <div className="v3-bubble"
+      onPointerDown={onDragStart}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
+      style={{
+        position:'absolute',
+        left: note.x ?? 24, top: note.y ?? 24,
+        width: sz.width,
+        animation:'v3bubblein .35s cubic-bezier(.3,1.4,.5,1)',
+        cursor: dragging ? 'grabbing' : 'grab',
+        zIndex: dragging ? 100 : 1,
+        userSelect:'none', touchAction:'none',
+      }}>
       <div style={{
         background:'#fff', border:`3px solid ${type.color}`, borderRadius:'24px 24px 24px 4px',
-        padding:'12px 14px 14px', minHeight: sz.minHeight, boxShadow:`0 4px 0 ${type.deep}`,
-        transform:`rotate(${note.tilt}deg)`,
+        padding:'12px 14px 14px', minHeight: sz.minHeight,
+        boxShadow: dragging ? `6px 10px 20px ${type.deep}88` : `0 4px 0 ${type.deep}`,
+        transform:`rotate(${note.tilt}deg)${dragging?' scale(1.04)':''}`,
         position:'relative',
         color: note.penColor && !isDrawNote ? note.penColor : '#2d2a26',
         fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize: sz.fontSize, lineHeight:1.35,
         wordBreak:'keep-all',
+        transition: dragging ? 'none' : 'box-shadow .15s, transform .15s',
       }}>
         <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:8}}>
           <div style={{width:22, height:22, borderRadius:'50%', background:type.color,
