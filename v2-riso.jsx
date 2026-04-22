@@ -411,7 +411,7 @@ function V2({width=1100, height=1400}){
 
       {/* Board */}
       <div style={{marginTop:36}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:14}}>
+        <div className="v2-board-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:14}}>
           <div>
             <div style={{fontFamily:'Jua', fontSize:13, color:'#8A6F5E', letterSpacing:2}}>MY BOARD</div>
             <h2 style={{fontFamily:'Jua', fontSize:30, margin:0}}>내 질문 도화지</h2>
@@ -466,36 +466,42 @@ function V2({width=1100, height=1400}){
       {toast && <V2Toast toast={toast} />}
       <style>{`
         @media print {
+          @page { margin: 14mm 12mm; size: A4 portrait; }
+
           .qc-no-print { display: none !important; }
 
-          /* 전체 페이지 여백 제거 */
-          @page { margin: 12mm 10mm; size: A4 portrait; }
-          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+          html, body {
+            margin: 0 !important; padding: 0 !important;
+            background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
 
-          /* 최상위 컨테이너: A4 전체 너비로 */
+          /* 최상위 컨테이너 */
           .v2-root {
             width: 100% !important;
             min-height: unset !important;
-            padding: 0 !important;
-            background: #fff !important;
+            padding: 16px 20px 24px !important;
+            background: #F4EBD9 !important;
           }
 
           /* 그레인 오버레이 숨김 */
           .v2-grain { display: none !important; }
 
-          /* 입력 카드 4개 숨김 */
+          /* 입력 카드 4개(질문 만들기 틀) 숨김 */
           .v2-cards { display: none !important; }
 
-          /* 도화지 영역: flex → block, 포스트잇이 자연스럽게 흘러내림 */
+          /* 도화지 헤더(MY BOARD / 내 질문 도화지) */
+          .v2-board-header { margin-bottom: 10px !important; }
+
+          /* 도화지 내부: flex → 다단, 포스트잇이 위→아래→다음단으로 흘러내림 */
           .v2-board-inner {
             display: block !important;
-            column-count: 3 !important;
-            column-gap: 14px !important;
-            padding: 16px 12px !important;
+            columns: 3 140px !important;
+            column-gap: 16px !important;
+            padding: 16px 14px !important;
             min-height: unset !important;
             box-shadow: none !important;
             border: 1.5px solid #3C2F2A !important;
-            background: #fff !important;
+            background: #FFF8ED !important;
           }
 
           /* 각 포스트잇: 페이지 경계에서 절대 잘리지 않음 */
@@ -504,13 +510,14 @@ function V2({width=1100, height=1400}){
             page-break-inside: avoid !important;
             display: inline-block !important;
             width: 100% !important;
-            margin-bottom: 12px !important;
+            margin: 0 0 14px 0 !important;
           }
 
-          /* 포스트잇 내부: 회전 제거, 그림자 단순화 */
+          /* 포스트잇 내부: 인쇄 시 회전 제거 */
           .v2-note-inner {
             transform: none !important;
-            box-shadow: 2px 2px 4px rgba(60,47,42,.12) !important;
+            box-shadow: 1px 2px 4px rgba(60,47,42,.15) !important;
+            clip-path: none !important;
           }
         }
       `}</style>
