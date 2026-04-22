@@ -256,11 +256,23 @@ function V2({width=1100, height=1400}){
     toastTimer.current = setTimeout(()=>setToast(null), action ? 4000 : 1800);
   };
 
+  const nextPos = (currentNotes, sz) => {
+    const s = V2_SIZES[sz||'M'];
+    const cols = Math.floor((1008) / (s.width + 22));
+    const idx = currentNotes.length;
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    return { x: 30 + col * (s.width + 22), y: 30 + row * (s.minHeight + 22) };
+  };
+
   const addNote = (type, size, penColor) => {
     const text = inputs[type].trim();
     if(!text){ showToast('먼저 질문을 써주세요'); return; }
     if(text.length > V2_MAX_CHARS){ showToast(`질문이 너무 길어요! ${V2_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return; }
-    setNotes(n => [...n, {id:idRef.current++, type, text, tilt:(Math.random()*12-6).toFixed(1), drawData:null, size:size||'M', penColor:penColor||'#3C2F2A'}]);
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text, tilt:(Math.random()*12-6).toFixed(1), drawData:null, size:size||'M', penColor:penColor||'#3C2F2A', x:pos.x, y:pos.y}];
+    });
     setInputs(i => ({...i, [type]:''}));
     showToast('도화지에 붙였어요!');
   };
@@ -268,9 +280,16 @@ function V2({width=1100, height=1400}){
   const addDrawNote = (type, canvasRef, size, penColor) => {
     if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
     const drawData = canvasRef.current.getDataURL();
-    setNotes(n => [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*12-6).toFixed(1), drawData, size:size||'M', penColor:penColor||'#3C2F2A'}]);
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {id:idRef.current++, type, text:'', tilt:(Math.random()*12-6).toFixed(1), drawData, size:size||'M', penColor:penColor||'#3C2F2A', x:pos.x, y:pos.y}];
+    });
     canvasRef.current.clear();
     showToast('도화지에 붙였어요!');
+  };
+
+  const moveNote = (id, x, y) => {
+    setNotes(n => n.map(note => note.id===id ? {...note, x, y} : note));
   };
 
   const delNote = (id) => {
@@ -436,10 +455,9 @@ function V2({width=1100, height=1400}){
 
         <div className="v2-board-inner" style={{
           position:'relative', background:'#FFF8ED',
-          border:'2px solid #3C2F2A', padding:'30px 26px', minHeight:320,
+          border:'2px solid #3C2F2A', minHeight:480,
           backgroundImage:`radial-gradient(circle, rgba(60,47,42,.12) 1px, transparent 1.5px)`,
           backgroundSize:'16px 16px', boxShadow:'6px 6px 0 #3C2F2A',
-          display:'flex', flexWrap:'wrap', gap:22, alignContent:'flex-start',
         }}>
           <V2Tape color="#FFC9B8" rotate={-40} width={70} top={-14} left={-18} pattern="stripe"/>
           <V2Tape color="#C6E3CF" rotate={38} width={70} top={-14} left={'calc(100% - 52px)'} pattern="dot"/>
@@ -449,7 +467,11 @@ function V2({width=1100, height=1400}){
             </div>
           ) : notes.map(n => {
             const t = V2_TYPES.find(x=>x.key===n.type);
-            return <V2Note key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} />;
+            return <V2Note key={n.id} note={n} type={t}
+              onDel={()=>delNote(n.id)}
+              onUpdate={(p)=>updateNote(n.id,p)}
+              onMove={(x,y)=>moveNote(n.id,x,y)}
+            />;
           })}
         </div>
       </div>
@@ -517,7 +539,7 @@ function V2({width=1100, height=1400}){
           }
           .v2-board-header h2 { font-size: 18px !important; margin: 0 !important; }
 
-          /* 도화지 내부: flex wrap, 페이지 자유롭게 넘어감 */
+          /* 도화지 내부: absolute → flex wrap으로 복귀 */
           .v2-board-inner {
             display: flex !important;
             flex-wrap: wrap !important;
@@ -531,13 +553,16 @@ function V2({width=1100, height=1400}){
             break-inside: auto !important;
           }
 
-          /* 포스트잇 wrapper: 3열, 잘리지 않음 */
+          /* 포스트잇 wrapper: absolute 해제 → 3열 정렬 */
           .v2-note-wrap {
+            position: static !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             flex-shrink: 0 !important;
             margin: 0 !important;
             width: calc((100% - 6mm) / 3) !important;
+            cursor: default !important;
+            z-index: auto !important;
           }
 
           /* 포스트잇 내부: 고정 높이 */
@@ -739,17 +764,39 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
   );
 }
 
-function V2Note({note, type, onDel, onUpdate}){
+function V2Note({note, type, onDel, onUpdate, onMove}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
   const [draftType, setDraftType] = React.useState(note.type);
   const [draftSize, setDraftSize] = React.useState(note.size||'M');
+  const [dragging, setDragging] = React.useState(false);
   const taRef = React.useRef(null);
   const editDrawRef = React.useRef(null);
   const composing = React.useRef(false);
+  const dragOffset = React.useRef({x:0, y:0});
   const isDrawNote = !!note.drawData;
 
   const sz = V2_SIZES[note.size||'M'];
+
+  const onDragStart = (e) => {
+    if(editing) return;
+    // 버튼 클릭은 드래그 시작 안 함
+    if(e.target.closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDragging(true);
+  };
+  const onDragMove = (e) => {
+    if(!dragging) return;
+    const board = e.currentTarget.closest('.v2-board-inner');
+    if(!board) return;
+    const boardRect = board.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - boardRect.left - dragOffset.current.x, boardRect.width - sz.width));
+    const y = Math.max(0, e.clientY - boardRect.top - dragOffset.current.y);
+    onMove(x, y);
+  };
+  const onDragEnd = () => setDragging(false);
 
   const openEdit = () => {
     setDraft(note.text);
@@ -780,6 +827,7 @@ function V2Note({note, type, onDel, onUpdate}){
 
   if(editing){
     return (
+      <div style={{position:'absolute', left: note.x ?? 30, top: note.y ?? 30, zIndex:200}}>
       <div className="qc-no-print" style={{
         position:'relative', width: isDrawNote ? 310 : 230, padding:'12px 14px',
         background:'#FFF8ED', border:`2px solid ${type.color}`,
@@ -831,18 +879,32 @@ function V2Note({note, type, onDel, onUpdate}){
         </div>
         <style>{`@keyframes v2notein{from{opacity:0;transform:scale(.7)}to{opacity:1}}`}</style>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="v2-note-wrap" style={{ position:'relative', width: sz.width }}>
+    <div className="v2-note-wrap"
+      onPointerDown={onDragStart}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
+      style={{
+        position:'absolute',
+        left: note.x ?? 30, top: note.y ?? 30,
+        width: sz.width,
+        cursor: dragging ? 'grabbing' : (editing ? 'default' : 'grab'),
+        zIndex: dragging ? 100 : 1,
+        userSelect: 'none', touchAction: 'none',
+      }}>
       <div className={`v2-note-inner${isDrawNote ? ' is-draw' : ''}`} style={{
         background: type.paper, padding:'14px 16px 30px', minHeight: sz.minHeight,
         fontFamily:'Gamja Flower', fontSize: sz.fontSize, lineHeight:1.35,
         color: note.penColor && !isDrawNote ? note.penColor : '#3C2F2A',
-        boxShadow:'3px 5px 10px rgba(60,47,42,.18)',
-        wordBreak:'keep-all', transform:`rotate(${note.tilt}deg)`,
+        boxShadow: dragging ? '8px 12px 24px rgba(60,47,42,.35)' : '3px 5px 10px rgba(60,47,42,.18)',
+        wordBreak:'keep-all', transform:`rotate(${note.tilt}deg) ${dragging?'scale(1.04)':''}`,
         clipPath:clip, position:'relative', animation:'v2notein .3s ease',
+        transition: dragging ? 'none' : 'box-shadow .15s, transform .15s',
       }}>
         <span style={{display:'inline-block', fontFamily:'Jua', fontSize:10, letterSpacing:2,
           padding:'2px 8px', color:type.color, border:`1px solid ${type.color}`, marginBottom:8}}>
