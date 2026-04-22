@@ -147,6 +147,10 @@ function V3({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
+  const updateNote = (id, {text, type}) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+    showToast('수정했어요 ✏️');
+  };
 
   React.useEffect(() => {
     const handler = (e) => {
@@ -323,7 +327,7 @@ function V3({width=1100, height=1400}){
             }}>여기에 질문 풍선이 둥실둥실 떠올라요 🎈✨</div>
           ) : notes.map(n => {
             const t = V3_TYPES.find(x=>x.key===n.type);
-            return <V3Bubble key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} />;
+            return <V3Bubble key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} />;
           })}
         </div>
       </div>
@@ -434,7 +438,75 @@ function V3Character({type, idx, value, onChange, onAdd, onExample, count, focus
   );
 }
 
-function V3Bubble({note, type, onDel}){
+function V3Bubble({note, type, onDel, onUpdate}){
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(note.text);
+  const [draftType, setDraftType] = React.useState(note.type);
+  const taRef = React.useRef(null);
+  const composing = React.useRef(false);
+
+  const openEdit = () => {
+    setDraft(note.text);
+    setDraftType(note.type);
+    setEditing(true);
+    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+  };
+  const save = () => {
+    const t = draft.trim();
+    if(t) onUpdate({text:t, type:draftType});
+    setEditing(false);
+  };
+  const cancel = () => setEditing(false);
+  const curType = V3_TYPES.find(t=>t.key===draftType);
+
+  if(editing){
+    return (
+      <div className="qc-no-print" style={{
+        position:'relative', width:220,
+        background:'#fff', border:`3px solid ${type.color}`,
+        borderRadius:16, padding:'12px 14px',
+        boxShadow:`0 6px 0 ${type.deep}`,
+        display:'flex', flexDirection:'column', gap:8,
+        animation:'v3bubblein .2s ease',
+      }}>
+        <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+          {V3_TYPES.map(t=>(
+            <button key={t.key} onClick={()=>setDraftType(t.key)} style={{
+              fontFamily:'Jua', fontSize:11, padding:'2px 8px', borderRadius:999,
+              border:`2px solid ${t.color}`,
+              background: draftType===t.key ? t.color : '#fff',
+              color: draftType===t.key ? '#fff' : t.deep,
+              cursor:'pointer',
+            }}>{t.icon} {t.label.replace(' 질문','')}</button>
+          ))}
+        </div>
+        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+          onCompositionStart={()=>{ composing.current=true; }}
+          onCompositionEnd={()=>{ composing.current=false; }}
+          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+          style={{
+            fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType ? curType.color : '#ccc'}`,
+            borderRadius:10, padding:'8px 10px', resize:'none', outline:'none',
+            minHeight:70, boxSizing:'border-box', width:'100%',
+          }}/>
+        <div style={{display:'flex', gap:6}}>
+          <button onClick={save} style={{
+            flex:1, fontFamily:'Jua', fontSize:14, padding:'7px 0', borderRadius:999,
+            border:'none', background: curType ? curType.color : '#888', color:'#fff', cursor:'pointer',
+          }}>저장</button>
+          <button onClick={cancel} style={{
+            fontFamily:'Jua', fontSize:14, padding:'7px 12px', borderRadius:999,
+            border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
+          }}>취소</button>
+          <button onClick={onDel} style={{
+            fontFamily:'Jua', fontSize:14, padding:'7px 12px', borderRadius:999,
+            border:'2px solid #ff6b9d', background:'#fff0f6', color:'#d63384', cursor:'pointer',
+          }}>삭제</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       position:'relative', width:200,
@@ -454,8 +526,12 @@ function V3Bubble({note, type, onDel}){
             <V3Face type={type} size={18}/>
           </div>
           <span style={{fontFamily:'Jua', fontSize:12, color:type.deep}}>{type.label}</span>
-          <button onClick={onDel} className="qc-no-print" style={{
+          <button onClick={openEdit} className="qc-no-print" style={{
             marginLeft:'auto', border:'none', background:'transparent', cursor:'pointer',
+            color:'#7a7064', fontSize:13,
+          }}>✏️</button>
+          <button onClick={onDel} className="qc-no-print" style={{
+            border:'none', background:'transparent', cursor:'pointer',
             color:'#7a7064', fontSize:14,
           }}>✕</button>
         </div>

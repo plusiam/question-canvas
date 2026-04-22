@@ -151,6 +151,10 @@ function V2({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
+  const updateNote = (id, {text, type}) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+    showToast('수정했어요 ✏️');
+  };
 
   React.useEffect(() => {
     const handler = (e) => {
@@ -320,7 +324,7 @@ function V2({width=1100, height=1400}){
             }}>오린 질문을 여기에 붙여봐요 ✂️📌</div>
           ) : notes.map(n => {
             const t = V2_TYPES.find(x=>x.key===n.type);
-            return <V2Note key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} />;
+            return <V2Note key={n.id} note={n} type={t} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} />;
           })}
         </div>
       </div>
@@ -443,13 +447,82 @@ function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx}){
   );
 }
 
-function V2Note({note, type, onDel}){
+function V2Note({note, type, onDel, onUpdate}){
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(note.text);
+  const [draftType, setDraftType] = React.useState(note.type);
+  const taRef = React.useRef(null);
+  const composing = React.useRef(false);
+
+  const openEdit = () => {
+    setDraft(note.text);
+    setDraftType(note.type);
+    setEditing(true);
+    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+  };
+  const save = () => {
+    const t = draft.trim();
+    if(t) onUpdate({text:t, type:draftType});
+    setEditing(false);
+  };
+  const cancel = () => setEditing(false);
+  const curType = V2_TYPES.find(t=>t.key===draftType);
+
   const clips = [
     'polygon(3% 4%,97% 2%,100% 95%,2% 97%)',
     'polygon(0 4%,98% 0,100% 97%,4% 100%)',
     'polygon(2% 0,100% 6%,96% 100%,0 95%)',
   ];
   const clip = clips[note.id % 3];
+
+  if(editing){
+    return (
+      <div className="qc-no-print" style={{
+        position:'relative', width:210, padding:'12px 14px',
+        background:'#FFF8ED', border:`2px solid ${type.color}`,
+        boxShadow:'4px 4px 0 rgba(60,47,42,.3)',
+        display:'flex', flexDirection:'column', gap:8,
+        animation:'v2notein .2s ease',
+      }}>
+        <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+          {V2_TYPES.map(t=>(
+            <button key={t.key} onClick={()=>setDraftType(t.key)} style={{
+              fontFamily:'Jua', fontSize:10, padding:'2px 7px', letterSpacing:1,
+              border:`1.5px solid ${t.color}`,
+              background: draftType===t.key ? t.color : 'transparent',
+              color: draftType===t.key ? '#fff' : t.color,
+              cursor:'pointer',
+            }}>{t.sub}</button>
+          ))}
+        </div>
+        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+          onCompositionStart={()=>{ composing.current=true; }}
+          onCompositionEnd={()=>{ composing.current=false; }}
+          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+          style={{
+            fontFamily:'Gamja Flower', fontSize:18, border:`1.5px solid ${curType ? curType.color : '#ccc'}`,
+            padding:'8px 10px', resize:'none', outline:'none', minHeight:70,
+            boxSizing:'border-box', width:'100%', background:'#fffcf5',
+          }}/>
+        <div style={{display:'flex', gap:6}}>
+          <button onClick={save} style={{
+            flex:1, fontFamily:'Jua', fontSize:13, padding:'7px 0',
+            border:'none', background: curType ? curType.color : '#888', color:'#fff', cursor:'pointer',
+          }}>저장</button>
+          <button onClick={cancel} style={{
+            fontFamily:'Jua', fontSize:13, padding:'7px 10px',
+            border:'1.5px solid #ccc', background:'#f5f0e8', cursor:'pointer',
+          }}>취소</button>
+          <button onClick={onDel} style={{
+            fontFamily:'Jua', fontSize:13, padding:'7px 10px',
+            border:'1.5px solid #e8305a', background:'#fff0f3', color:'#e8305a', cursor:'pointer',
+          }}>삭제</button>
+        </div>
+        <style>{`@keyframes v2notein{from{opacity:0;transform:scale(.7)}to{opacity:1}}`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       position:'relative', width:190,
@@ -467,6 +540,10 @@ function V2Note({note, type, onDel}){
           padding:'2px 8px', color:type.color, border:`1px solid ${type.color}`, marginBottom:8,
         }}>{type.sub}</span>
         <div>{note.text}</div>
+        <button onClick={openEdit} className="qc-no-print" style={{
+          position:'absolute', bottom:6, left:8, border:'none', background:'transparent',
+          fontSize:13, cursor:'pointer', color:'#8A6F5E',
+        }}>✏️</button>
         <button onClick={onDel} className="qc-no-print" style={{
           position:'absolute', bottom:6, right:8, border:'none', background:'transparent',
           fontSize:14, cursor:'pointer', color:'#8A6F5E',

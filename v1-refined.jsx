@@ -115,6 +115,10 @@ function V1({width=1100, height=1400}){
       clearTimeout(toastTimer.current);
     }});
   };
+  const updateNote = (id, {text, type}) => {
+    setNotes(n => n.map(x => x.id===id ? {...x, text, type} : x));
+    showToast('수정했어요 ✏️');
+  };
 
   React.useEffect(() => {
     const handler = (e) => {
@@ -281,7 +285,7 @@ function V1({width=1100, height=1400}){
               fontFamily:'Gaegu', fontSize:24, color:'#7a7064', width:'100%', textAlign:'center', padding:'40px 10px',
             }}>여기에 만든 질문이 포스트잇처럼 붙어요 🎨</div>
           ) : notes.map(n => (
-            <V1Note key={n.id} note={n} onDel={()=>delNote(n.id)} type={V1_TYPES.find(t=>t.key===n.type)} />
+            <V1Note key={n.id} note={n} onDel={()=>delNote(n.id)} onUpdate={(p)=>updateNote(n.id,p)} type={V1_TYPES.find(t=>t.key===n.type)} />
           ))}
         </div>
       </div>
@@ -455,7 +459,73 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count}){
   );
 }
 
-function V1Note({note, type, onDel}){
+function V1Note({note, type, onDel, onUpdate}){
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(note.text);
+  const [draftType, setDraftType] = React.useState(note.type);
+  const taRef = React.useRef(null);
+  const composing = React.useRef(false);
+
+  const openEdit = () => {
+    setDraft(note.text);
+    setDraftType(note.type);
+    setEditing(true);
+    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
+  };
+  const save = () => {
+    const t = draft.trim();
+    if(t) onUpdate({text:t, type:draftType});
+    setEditing(false);
+  };
+  const cancel = () => setEditing(false);
+  const curType = V1_TYPES.find(t=>t.key===draftType);
+
+  if(editing){
+    return (
+      <div className="v1-note qc-no-print" style={{
+        width:200, padding:'12px 14px', borderRadius:10,
+        background:'#fff', border:`3px solid ${type.color}`,
+        boxShadow:'4px 4px 0 #2d2a26', display:'flex', flexDirection:'column', gap:8,
+        animation:'v1noteIn .2s ease',
+      }}>
+        <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+          {V1_TYPES.map(t=>(
+            <button key={t.key} onClick={()=>setDraftType(t.key)} style={{
+              fontFamily:'Jua', fontSize:11, padding:'2px 8px', borderRadius:999,
+              border:`2px solid ${t.color}`,
+              background: draftType===t.key ? t.color : '#fff',
+              color: draftType===t.key ? '#fff' : t.color,
+              cursor:'pointer',
+            }}>{t.icon} {t.label.replace(' 질문','')}</button>
+          ))}
+        </div>
+        <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+          onCompositionStart={()=>{ composing.current=true; }}
+          onCompositionEnd={()=>{ composing.current=false; }}
+          onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();save();} if(e.key==='Escape') cancel(); }}
+          style={{
+            fontFamily:'Gaegu', fontSize:18, border:`2px solid ${curType.soft}`,
+            borderRadius:8, padding:'8px 10px', resize:'none', outline:'none',
+            minHeight:70, boxSizing:'border-box', width:'100%',
+          }}/>
+        <div style={{display:'flex', gap:6}}>
+          <button onClick={save} style={{
+            flex:1, fontFamily:'Jua', fontSize:14, padding:'7px 0', borderRadius:8,
+            border:'none', background:curType.color, color:'#fff', cursor:'pointer',
+          }}>저장</button>
+          <button onClick={cancel} style={{
+            fontFamily:'Jua', fontSize:14, padding:'7px 12px', borderRadius:8,
+            border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
+          }}>취소</button>
+          <button onClick={onDel} style={{
+            fontFamily:'Jua', fontSize:14, padding:'7px 12px', borderRadius:8,
+            border:'2px solid #ffb3b3', background:'#fff0f0', color:'#c0392b', cursor:'pointer',
+          }}>삭제</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="v1-note" style={{
       width:180, minHeight:150, padding:'14px 16px 30px',
@@ -463,7 +533,7 @@ function V1Note({note, type, onDel}){
       color:'#2d2a26', boxShadow:'3px 6px 12px rgba(62,48,30,.18)',
       position:'relative', wordBreak:'keep-all', overflowWrap:'anywhere', borderRadius:2,
       background:type.soft, transform:`rotate(${note.tilt}deg)`,
-      animation:'v1noteIn .3s ease', overflow:'hidden',
+      animation:'v1noteIn .3s ease', overflow:'hidden', cursor:'default',
     }}>
       <span style={{
         position:'absolute', top:-6, left:'50%', transform:'translateX(-50%)',
@@ -476,6 +546,10 @@ function V1Note({note, type, onDel}){
         borderRadius:999, color:'#fff', marginBottom:8, background:type.color,
       }}>{type.label}</span>
       <div style={{fontSize: note.text.length > 60 ? 15 : 18, lineHeight:1.4}}>{note.text}</div>
+      <button onClick={openEdit} className="qc-no-print" style={{
+        position:'absolute', bottom:6, left:8, border:'none', background:'transparent',
+        fontSize:14, cursor:'pointer', color:'#7a7064', padding:'2px 6px', borderRadius:6,
+      }}>✏️</button>
       <button onClick={onDel} className="qc-no-print" style={{
         position:'absolute', bottom:6, right:8, border:'none', background:'transparent',
         fontSize:16, cursor:'pointer', color:'#7a7064', padding:'2px 6px', borderRadius:6,
