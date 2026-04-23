@@ -494,6 +494,9 @@ function V1({width=1100, height=1400}){
     });
   };
 
+  const [activeModal, setActiveModal] = React.useState(null);
+  // null | { kind: 'text'|'draw', typeKey, noteSize, penColor }
+
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V1_TYPES.every(t => counts[t.key] >= 1);
 
@@ -580,9 +583,10 @@ function V1({width=1100, height=1400}){
             value={inputs[t.key]}
             onChange={(v)=>setInputs(i=>({...i,[t.key]:v}))}
             onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
-            onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
+            onOpenText={(ns,pc)=>setActiveModal({kind:'text', typeKey:t.key, noteSize:ns, penColor:pc})}
+            onOpenDraw={(ns,pc)=>setActiveModal({kind:'draw', typeKey:t.key, noteSize:ns, penColor:pc})}
           />
         ))}
       </div>
@@ -635,6 +639,38 @@ function V1({width=1100, height=1400}){
       <div className="v1-copyright" style={{textAlign:'center', marginTop:30, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 룰루랄라 한기쌤 · 질문 만들기 학습지
       </div>
+
+      {activeModal && (() => {
+        const t = V1_TYPES.find(x=>x.key===activeModal.typeKey);
+        if (!t) return null;
+        if (activeModal.kind === 'text') return (
+          <V1TextModal
+            key={activeModal.typeKey}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={()=>{ addNote(activeModal.typeKey, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            onExample={()=>exampleFor(activeModal.typeKey)}
+            value={inputs[activeModal.typeKey]}
+            onChange={v=>setInputs(s=>({...s,[activeModal.typeKey]:v}))}
+            typeColor={t.color}
+            type={t}
+            noteSize={activeModal.noteSize}
+            onSize={k=>setActiveModal(m=>({...m, noteSize:k}))}
+          />
+        );
+        return (
+          <V1DrawModal
+            key={activeModal.typeKey+'-draw'}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={(ref)=>{ addDrawNote(activeModal.typeKey, ref, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            bgColor={t.paper}
+            penColor={activeModal.penColor}
+            typeColor={t.color}
+            type={t}
+          />
+        );
+      })()}
 
       {toast && <V1Toast toast={toast} />}
 
@@ -754,29 +790,12 @@ function V1Field({label, value, onChange, width, placeholder}){
   );
 }
 
-function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count}){
+function V1TypeCard({type, value, onChange, onAdd, onExample, count, onOpenText, onOpenDraw}){
   const [h, setH] = React.useState(false);
-  const [exampleUsed, setExampleUsed] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
-  const [inputMode, setInputMode] = React.useState('text');
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#2d2a26');
-  const [drawModalOpen, setDrawModalOpen] = React.useState(false);
-  const [textModalOpen, setTextModalOpen] = React.useState(false);
-  const composing = React.useRef(false);
-  const taRef = React.useRef(null);
-  const drawCanvasRef = React.useRef(null);
   const over = value.length > V1_MAX_CHARS;
-
-  const handleExample = () => {
-    onExample();
-    setExampleUsed(true);
-    setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 50);
-  };
-  const handleChange = (v) => {
-    onChange(v);
-    if(exampleUsed) setExampleUsed(false);
-  };
 
   return (
     <div style={{
@@ -829,7 +848,7 @@ function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count})
       />
 
       {/* 텍스트 입력 미리보기 — 클릭하면 모달 오픈 */}
-      <div className="qc-no-print" onClick={()=>setTextModalOpen(true)} style={{
+      <div className="qc-no-print" onClick={()=>onOpenText(noteSize, penColor)} style={{
         fontFamily:'Gaegu', fontSize:18, border:`2px solid ${over?'#D63384':'#e5ddc6'}`, borderRadius:10,
         padding:'10px 12px', minHeight:50, background: over?'#fff0f6':'#fffcf4', boxSizing:'border-box',
         color: value ? '#2d2a26' : '#bbb', cursor:'text', lineHeight:1.5, position:'relative',
@@ -842,7 +861,7 @@ function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count})
       </div>
 
       <div className="qc-no-print" style={{display:'flex', gap:8}}>
-        <button onClick={handleExample} style={{
+        <button onClick={onExample} style={{
           background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
           fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
           whiteSpace:'nowrap',
@@ -852,34 +871,11 @@ function V1TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count})
           color:'#fff', cursor:'pointer', fontSize:16, background:type.color,
           opacity: over||!value.trim() ? 0.5 : 1,
         }}>+ 도화지에 붙이기</button>
-        <button onClick={()=>setDrawModalOpen(true)} style={{
+        <button onClick={()=>onOpenDraw(noteSize, penColor)} style={{
           fontFamily:'Jua', fontSize:14, padding:'8px 12px', border:`2px solid ${type.color}`,
           borderRadius:10, color:type.color, background:'#fff', cursor:'pointer', whiteSpace:'nowrap',
         }}>✏️ 손으로</button>
       </div>
-
-      <V1TextModal
-        open={textModalOpen}
-        onClose={()=>setTextModalOpen(false)}
-        onConfirm={()=>{ onAdd(noteSize, penColor); setTextModalOpen(false); }}
-        onExample={()=>{ onExample(); setExampleUsed(true); }}
-        value={value}
-        onChange={handleChange}
-        typeColor={type.color}
-        type={type}
-        noteSize={noteSize}
-        onSize={setNoteSize}
-      />
-
-      <V1DrawModal
-        open={drawModalOpen}
-        onClose={()=>setDrawModalOpen(false)}
-        onConfirm={(ref)=>{ onAddDraw(ref, noteSize, penColor); setDrawModalOpen(false); }}
-        bgColor={type.paper}
-        penColor={penColor}
-        typeColor={type.color}
-        type={type}
-      />
     </div>
   );
 }

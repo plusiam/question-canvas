@@ -495,6 +495,9 @@ function V2({width=1100, height=1400}){
     });
   };
 
+  const [activeModal, setActiveModal] = React.useState(null);
+  // null | { kind: 'text'|'draw', typeKey, noteSize, penColor }
+
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V2_TYPES.every(t => counts[t.key] >= 1);
 
@@ -567,9 +570,10 @@ function V2({width=1100, height=1400}){
             value={inputs[t.key]}
             onChange={v=>setInputs(i=>({...i,[t.key]:v}))}
             onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
-            onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
             onExample={()=>exampleFor(t.key)}
             count={counts[t.key]}
+            onOpenText={(ns,pc)=>setActiveModal({kind:'text', typeKey:t.key, noteSize:ns, penColor:pc})}
+            onOpenDraw={(ns,pc)=>setActiveModal({kind:'draw', typeKey:t.key, noteSize:ns, penColor:pc})}
           />
         ))}
       </div>
@@ -630,6 +634,38 @@ function V2({width=1100, height=1400}){
       <div className="v2-copyright" style={{textAlign:'center', marginTop:30, color:'#8A6F5E', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 질문 공방 · 룰루랄라 한기쌤
       </div>
+
+      {activeModal && (() => {
+        const t = V2_TYPES.find(x=>x.key===activeModal.typeKey);
+        if (!t) return null;
+        if (activeModal.kind === 'text') return (
+          <V2TextModal
+            key={activeModal.typeKey}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={()=>{ addNote(activeModal.typeKey, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            onExample={()=>exampleFor(activeModal.typeKey)}
+            value={inputs[activeModal.typeKey]}
+            onChange={v=>setInputs(s=>({...s,[activeModal.typeKey]:v}))}
+            typeColor={t.color}
+            type={t}
+            noteSize={activeModal.noteSize}
+            onSize={k=>setActiveModal(m=>({...m, noteSize:k}))}
+          />
+        );
+        return (
+          <V2DrawModal
+            key={activeModal.typeKey+'-draw'}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={(ref)=>{ addDrawNote(activeModal.typeKey, ref, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            bgColor={t.paper}
+            penColor={activeModal.penColor}
+            typeColor={t.color}
+            type={t}
+          />
+        );
+      })()}
 
       {toast && <V2Toast toast={toast} />}
       <style>{`
@@ -796,14 +832,10 @@ function V2NoteOptions({ size, onSize, penColor, onPenColor, typeColor, showColo
   );
 }
 
-function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, idx}){
+function V2TypeCard({type, value, onChange, onAdd, onExample, count, idx, onOpenText, onOpenDraw}){
   const [h, setH] = React.useState(false);
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#3C2F2A');
-  const [drawModalOpen, setDrawModalOpen] = React.useState(false);
-  const [textModalOpen, setTextModalOpen] = React.useState(false);
-  const composing = React.useRef(false);
-  const drawCanvasRef = React.useRef(null);
   const over = value.length > V2_MAX_CHARS;
   const rotations = [-1.2, 1, -0.6, 1.5];
   const tapeColors = ['#FFE8A3', '#FFC9B8', '#C6E3CF', '#E1D9EF'];
@@ -851,7 +883,7 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
       />
 
       {/* 텍스트 미리보기 — 클릭하면 모달 오픈 */}
-      <div className="qc-no-print" onClick={()=>setTextModalOpen(true)} style={{
+      <div className="qc-no-print" onClick={()=>onOpenText(noteSize, penColor)} style={{
         fontFamily:'Gaegu', fontSize:18, border:`1.5px solid ${over?'#D63384':type.color}`,
         padding:'10px 12px', minHeight:50, background: over?'#fff0f6':'#FFFBF0', boxSizing:'border-box',
         color: value?'#3C2F2A':'#bbb', cursor:'text', lineHeight:1.5, position:'relative',
@@ -872,34 +904,11 @@ function V2TypeCard({type, value, onChange, onAdd, onAddDraw, onExample, count, 
           color:'#FFF6E1', cursor:'pointer', fontSize:16, background:type.color,
           boxShadow:`2px 2px 0 #3C2F2A`, opacity: over||!value.trim()?0.5:1,
         }}>✂️ 오려서 붙이기</button>
-        <button onClick={()=>setDrawModalOpen(true)} style={{
+        <button onClick={()=>onOpenDraw(noteSize, penColor)} style={{
           fontFamily:'Jua', fontSize:13, padding:'9px 12px', border:`1.5px solid ${type.color}`,
           color:type.color, background:'transparent', cursor:'pointer', whiteSpace:'nowrap',
         }}>✏️ 손으로</button>
       </div>
-
-      <V2TextModal
-        open={textModalOpen}
-        onClose={()=>setTextModalOpen(false)}
-        onConfirm={()=>{ onAdd(noteSize, penColor); setTextModalOpen(false); }}
-        onExample={onExample}
-        value={value}
-        onChange={onChange}
-        typeColor={type.color}
-        type={type}
-        noteSize={noteSize}
-        onSize={setNoteSize}
-      />
-
-      <V2DrawModal
-        open={drawModalOpen}
-        onClose={()=>setDrawModalOpen(false)}
-        onConfirm={(ref)=>{ onAddDraw(ref, noteSize, penColor); setDrawModalOpen(false); }}
-        bgColor={type.paper}
-        penColor={penColor}
-        typeColor={type.color}
-        type={type}
-      />
     </div>
   );
 }

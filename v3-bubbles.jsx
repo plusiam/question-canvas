@@ -534,6 +534,9 @@ function V3({width=1100, height=1400}){
     });
   };
 
+  const [activeModal, setActiveModal] = React.useState(null);
+  // activeModal: null | { kind: 'text'|'draw', typeKey: string, noteSize: string, penColor: string }
+
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V3_TYPES.every(t => counts[t.key] >= 1);
 
@@ -621,6 +624,8 @@ function V3({width=1100, height=1400}){
             focused={focused===t.key}
             onFocus={()=>setFocused(t.key)}
             onBlur={()=>setFocused(null)}
+            onOpenText={(noteSize, penColor)=>setActiveModal({kind:'text', typeKey:t.key, noteSize, penColor})}
+            onOpenDraw={(noteSize, penColor)=>setActiveModal({kind:'draw', typeKey:t.key, noteSize, penColor})}
           />
         ))}
       </div>
@@ -679,6 +684,38 @@ function V3({width=1100, height=1400}){
       <div className="v3-copyright" style={{position:'relative', zIndex:2, textAlign:'center', marginTop:24, color:'#7a7064', fontSize:13, fontFamily:'Gaegu'}}>
         ⓒ 질문 풍선 놀이터 · 룰루랄라 한기쌤
       </div>
+
+      {activeModal && (() => {
+        const t = V3_TYPES.find(x => x.key === activeModal.typeKey);
+        if (activeModal.kind === 'text') return (
+          <V3TextModal
+            key={activeModal.typeKey}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={()=>{ addNote(activeModal.typeKey, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            onExample={()=>exampleFor(activeModal.typeKey)}
+            value={inputs[activeModal.typeKey]}
+            onChange={v=>setInputs(s=>({...s,[activeModal.typeKey]:v}))}
+            typeColor={t.color}
+            type={t}
+            noteSize={activeModal.noteSize}
+            onSize={k=>setActiveModal(m=>({...m, noteSize:k}))}
+          />
+        );
+        if (activeModal.kind === 'draw') return (
+          <V3DrawModal
+            key={activeModal.typeKey}
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={(ref)=>{ addDrawNote(activeModal.typeKey, ref, activeModal.noteSize, activeModal.penColor); setActiveModal(null); }}
+            bgColor="#fff"
+            penColor={activeModal.penColor}
+            typeColor={t.color}
+            type={t}
+          />
+        );
+        return null;
+      })()}
 
       {toast && <V3Toast toast={toast}/>}
 
@@ -783,12 +820,10 @@ function V3({width=1100, height=1400}){
   );
 }
 
-function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur, isDrawMode, onSetDrawMode}){
+function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur, isDrawMode, onSetDrawMode, onOpenText, onOpenDraw}){
   const [hover, setHover] = React.useState(false);
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#2d2a26');
-  const [drawModalOpen, setDrawModalOpen] = React.useState(false);
-  const [textModalOpen, setTextModalOpen] = React.useState(false);
   const composing = React.useRef(false);
   const drawCanvasRef = React.useRef(null);
   const over = value.length > V3_MAX_CHARS;
@@ -853,7 +888,7 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
         />
 
         {/* 텍스트 미리보기 — 클릭하면 모달 오픈 */}
-        <div className="qc-no-print" onClick={()=>setTextModalOpen(true)} style={{
+        <div className="qc-no-print" onClick={()=>onOpenText(noteSize, penColor)} style={{
           fontFamily:'Gaegu', fontSize:15, border:`2px solid ${over?'#D63384':'#2d2a26'}`, borderRadius:14,
           padding:'8px 10px', minHeight:48, background: over?'#fff0f6':'#fff', boxSizing:'border-box',
           color: value?'#2d2a26':'rgba(255,255,255,.7)', cursor:'text', lineHeight:1.5, position:'relative',
@@ -874,34 +909,12 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
             color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',
             boxShadow:'2px 2px 0 #2d2a26', opacity: over||!value.trim() ? 0.5 : 1,
           }}>🎈 띄우기</button>
-          <button onClick={()=>setDrawModalOpen(true)} style={{
+          <button onClick={()=>onOpenDraw(noteSize, penColor)} style={{
             fontFamily:'Jua', fontSize:12, padding:'7px 10px', border:'2px solid #2d2a26', borderRadius:10,
             color:'#2d2a26', background:'rgba(255,255,255,.8)', cursor:'pointer', whiteSpace:'nowrap',
           }}>✏️ 손으로</button>
         </div>
 
-        <V3TextModal
-          open={textModalOpen}
-          onClose={()=>setTextModalOpen(false)}
-          onConfirm={()=>{ onAdd(noteSize, penColor); setTextModalOpen(false); }}
-          onExample={onExample}
-          value={value}
-          onChange={onChange}
-          typeColor={type.color}
-          type={type}
-          noteSize={noteSize}
-          onSize={setNoteSize}
-        />
-
-        <V3DrawModal
-          open={drawModalOpen}
-          onClose={()=>setDrawModalOpen(false)}
-          onConfirm={(ref)=>{ onAddDraw(ref, noteSize, penColor); setDrawModalOpen(false); }}
-          bgColor="#fff"
-          penColor={penColor}
-          typeColor={type.color}
-          type={type}
-        />
       </div>
 
       {/* tail */}
