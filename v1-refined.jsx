@@ -1,13 +1,23 @@
+const QCShared = window.QCShared;
+
 const V1_TYPES = [
   { key:'fact',    label:'사실 질문',  icon:'🔍', hint:['~~~~ ', '무엇', '일까?'],             placeholder:'무엇을 물어보고 싶어요?',   color:'#2E86C1', soft:'#BCE0F5', paper:'#EAF5FC',
     desc:'이야기에서 실제로 일어난 일을 묻는 질문이에요. 책에서 답을 찾을 수 있어요.' },
-  { key:'think',   label:'생각 질문',  icon:'💭', hint:['', '왜', ' ~~~~ ?'],                 placeholder:'왜 그랬을지 궁금해요?',     color:'#E6A817', soft:'#FDECB6', paper:'#FFF6D9',
-    desc:'인물이 왜 그렇게 했는지 그 까닭을 생각해 보는 질문이에요. 내 생각을 말해야 해요.' },
   { key:'heart',   label:'느낌 질문',  icon:'💗', hint:['~~~~ 어떤 ', '느낌', '이었을까?'],     placeholder:'어떤 느낌이었을지 물어볼까요?', color:'#D63384', soft:'#F9CEDF', paper:'#FDE4EE',
     desc:'인물의 마음이나 감정을 상상해 보는 질문이에요. 공감 능력이 필요해요!' },
+  { key:'think',   label:'생각 질문',  icon:'💭', hint:['', '왜', ' ~~~~ ?'],                 placeholder:'왜 그랬을지 궁금해요?',     color:'#E6A817', soft:'#FDECB6', paper:'#FFF6D9',
+    desc:'인물이 왜 그렇게 했는지 그 까닭을 생각해 보는 질문이에요. 내 생각을 말해야 해요.' },
   { key:'imagine', label:'상상 질문',  icon:'✨', hint:['', '만약에', ' ~~~~ ?'],             placeholder:'만약에 ~하면 어떻게 될까?',  color:'#7A4FBA', soft:'#DCCCF0', paper:'#EBDFF5',
     desc:'"만약에~"로 시작해서 이야기가 다르게 펼쳐진다면 어떨지 상상하는 질문이에요.' },
+  { key:'mix',     label:'복합 질문',  icon:'🌈',
+    color:'#2D3A8A', soft:'#E0E4FF', paper:'#EEF1FF',
+    gradient:'linear-gradient(90deg,#2E86C1,#E6A817,#D63384,#7A4FBA)',
+    desc:'두 가지 이상이 섞인 질문이에요. 전제(어떤 상황·감정 가정)와 질문을 나누어 써봐요. 예: 슬펐을 때(느낌) 친구는 무엇을 생각했을까(생각)?' },
 ];
+
+/* 2×2 그리드와 노트 편집용 기본 4타입 */
+const V1_BASIC_TYPES = V1_TYPES.slice(0, 4);
+const V1_MIX_TYPE = V1_TYPES[4];
 
 const V1_EXAMPLES = (c) => {
   const a = c.char1 || '이 친구';
@@ -17,6 +27,12 @@ const V1_EXAMPLES = (c) => {
     think:  [`${a}는 왜 그랬을까요?`, `${b}는 왜 그런 말을 했을까요?`, `두 사람이 그렇게 한 까닭은 무엇일까요?`],
     heart:  [`${a}는 그때 어떤 느낌이었을까요?`, `${b}의 마음은 어땠을까요?`, `두 사람은 각각 어떤 기분이었을까요?`],
     imagine:[`만약에 ${a}가 다르게 행동했다면 어떻게 되었을까요?`, `만약에 내가 ${a}라면 어떻게 했을까요?`, `만약에 ${b}가 먼저 다가갔다면 어땠을까요?`],
+    mix: [
+      { premise:{subType:'heart', text:`${a}가 슬펐다면`},      subType:'think',   text:`${b}는 무엇을 생각했을까요?` },
+      { premise:{subType:'imagine', text:`만약 ${a}가 먼저 사과했다면`}, subType:'heart', text:`${b}는 어떤 기분이었을까요?` },
+      { premise:{subType:'fact', text:`${a}가 혼자 남았을 때`}, subType:'imagine', text:`어떤 일이 벌어졌을까요?` },
+      { premise:{subType:'think', text:`${a}가 그렇게 말한 까닭이 있었다면`}, subType:'heart', text:`${b}의 마음은 어땠을까요?` },
+    ],
   };
 };
 
@@ -128,6 +144,163 @@ function V1TextModal({ open, onClose, onConfirm, onExample, value, onChange, typ
             flex:1, fontFamily:'Jua', padding:'12px 14px', border:'none', borderRadius:10,
             color:'#fff', cursor:'pointer', fontSize:17, background:typeColor,
             opacity: !value.trim()||over ? 0.5 : 1,
+            boxShadow:`0 4px 0 #2d2a26`,
+          }}>+ 도화지에 붙이기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 복합 질문 모달 (v1) — 전제 + 질문 이중 입력 ── */
+function V1MixModal({ open, onClose, onConfirm, onExample, value, onChange, noteSize, onSize }) {
+  const taRef = React.useRef(null);
+  const preRef = React.useRef(null);
+  const composing = React.useRef(false);
+  const mainOver = value.text.length > V1_MAX_CHARS;
+  const preOver = value.premiseText.length > V1_MAX_CHARS;
+
+  React.useEffect(() => {
+    if (open) setTimeout(() => { preRef.current?.focus(); }, 50);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  if (!open) return null;
+
+  const canConfirm = value.text.trim() && value.premiseText.trim() && !mainOver && !preOver;
+  const handleConfirm = () => { if (canConfirm) onConfirm(); };
+
+  const preType = V1_BASIC_TYPES.find(t=>t.key===value.premiseSubType) || V1_BASIC_TYPES[2];
+  const mainType = V1_BASIC_TYPES.find(t=>t.key===value.subType) || V1_BASIC_TYPES[1];
+
+  const TypeChips = ({selected, onSelect, label}) => (
+    <div style={{display:'flex', gap:6, alignItems:'center', flexWrap:'wrap'}}>
+      <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:28}}>{label}</span>
+      {V1_BASIC_TYPES.map(t => (
+        <button key={t.key} onClick={()=>onSelect(t.key)} style={{
+          fontFamily:'Jua', fontSize:12, padding:'4px 10px', borderRadius:999,
+          border:`2px solid ${t.color}`,
+          background: selected===t.key ? t.color : '#fff',
+          color: selected===t.key ? '#fff' : t.color,
+          cursor:'pointer',
+        }}>{t.icon} {t.label.replace(' 질문','')}</button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="qc-no-print" onClick={onClose} style={{
+      position:'fixed', inset:0, zIndex:1000,
+      background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center',
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:'#fff', borderRadius:20, border:`4px solid transparent`,
+        backgroundImage:`linear-gradient(#fff,#fff), ${V1_MIX_TYPE.gradient}`,
+        backgroundOrigin:'border-box', backgroundClip:'padding-box, border-box',
+        boxShadow:`0 8px 0 #2d2a26`, padding:'24px 28px',
+        display:'flex', flexDirection:'column', gap:14,
+        width:560, maxWidth:'95vw', maxHeight:'92vh', overflowY:'auto',
+      }}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+          <div style={{display:'flex', alignItems:'center', gap:10}}>
+            <div style={{
+              width:36, height:36, borderRadius:'50%',
+              background:V1_MIX_TYPE.gradient,
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:18,
+              border:'2px solid #2d2a26',
+            }}>🌈</div>
+            <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>복합 질문</span>
+          </div>
+          <button onClick={onClose} style={{
+            fontFamily:'Jua', fontSize:14, padding:'4px 14px', borderRadius:999,
+            border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
+          }}>닫기</button>
+        </div>
+
+        <p style={{fontFamily:'Gaegu', fontSize:17, color:'#7a7064', margin:0, lineHeight:1.4}}>
+          전제(어떤 상황·감정 가정)와 질문을 나눠서 써봐요.
+        </p>
+
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <span style={{fontFamily:'Jua', fontSize:12, color:'#7a7064', minWidth:28}}>크기</span>
+          {Object.entries(V1_SIZES).map(([k,v]) => (
+            <button key={k} onClick={()=>onSize(k)} style={{
+              fontFamily:'Jua', fontSize:12, width:32, height:26, borderRadius:6,
+              border:`1.5px solid ${V1_MIX_TYPE.color}`,
+              background: noteSize===k ? V1_MIX_TYPE.color : '#fff',
+              color: noteSize===k ? '#fff' : V1_MIX_TYPE.color, cursor:'pointer',
+            }}>{v.label}</button>
+          ))}
+        </div>
+
+        {/* 전제 섹션 */}
+        <div style={{border:`2px dashed ${preType.soft}`, borderRadius:12, padding:'10px 12px', background:preType.paper}}>
+          <TypeChips selected={value.premiseSubType}
+            onSelect={k=>onChange({...value, premiseSubType:k})}
+            label="전제"
+          />
+          <div style={{position:'relative', marginTop:8}}>
+            <textarea ref={preRef} value={value.premiseText}
+              onChange={e=>onChange({...value, premiseText:e.target.value})}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              placeholder="예) 슬펐을 때 / 만약 ~였다면"
+              style={{
+                fontFamily:'Gaegu', fontSize:19, border:`2px solid ${preOver?'#D63384':'#e5ddc6'}`, borderRadius:10,
+                padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:60,
+                background: preOver?'#fff0f6':'#fffcf4', boxSizing:'border-box', lineHeight:1.5,
+              }}/>
+            <span style={{
+              position:'absolute', bottom:6, right:10, fontFamily:'Noto Sans KR', fontSize:10,
+              color: preOver?'#D63384':'#aaa',
+            }}>{value.premiseText.length}/{V1_MAX_CHARS}</span>
+          </div>
+        </div>
+
+        {/* 아래 화살표 */}
+        <div style={{textAlign:'center', fontSize:20, color:'#999', margin:'-4px 0'}}>↓</div>
+
+        {/* 질문 섹션 */}
+        <div style={{border:`2px solid ${mainType.soft}`, borderRadius:12, padding:'10px 12px', background:mainType.paper}}>
+          <TypeChips selected={value.subType}
+            onSelect={k=>onChange({...value, subType:k})}
+            label="질문"
+          />
+          <div style={{position:'relative', marginTop:8}}>
+            <textarea ref={taRef} value={value.text}
+              onChange={e=>onChange({...value, text:e.target.value})}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey&&!composing.current){e.preventDefault();handleConfirm();} }}
+              placeholder="예) 친구는 무엇을 생각했을까요?"
+              style={{
+                fontFamily:'Gaegu', fontSize:19, border:`2px solid ${mainOver?'#D63384':'#e5ddc6'}`, borderRadius:10,
+                padding:'10px 12px', resize:'none', outline:'none', width:'100%', minHeight:70,
+                background: mainOver?'#fff0f6':'#fffcf4', boxSizing:'border-box', lineHeight:1.5,
+              }}/>
+            <span style={{
+              position:'absolute', bottom:6, right:10, fontFamily:'Noto Sans KR', fontSize:10,
+              color: mainOver?'#D63384':'#aaa',
+            }}>{value.text.length}/{V1_MAX_CHARS}</span>
+          </div>
+        </div>
+
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={onExample} style={{
+            background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'10px 14px',
+            fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
+            whiteSpace:'nowrap',
+          }}>힌트 💡</button>
+          <button onClick={handleConfirm} style={{
+            flex:1, fontFamily:'Jua', padding:'12px 14px', border:'none', borderRadius:10,
+            color:'#fff', cursor:'pointer', fontSize:17, background:V1_MIX_TYPE.color,
+            opacity: canConfirm ? 1 : 0.5,
             boxShadow:`0 4px 0 #2d2a26`,
           }}>+ 도화지에 붙이기</button>
         </div>
@@ -253,7 +426,7 @@ const V1DrawCanvas = React.forwardRef(function V1DrawCanvas({ bgColor='#fff', pe
   const clearAll = () => {
     const ctx = canvasEl.current.getContext('2d');
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, 280, 160);
+    ctx.fillRect(0, 0, W, H);
     isDirtyRef.current = false;
   };
 
@@ -347,6 +520,10 @@ function V1Toast({toast}){
 function V1({width=1100, height=1400}){
   const [notes, setNotes] = React.useState([]);
   const [inputs, setInputs] = React.useState({fact:'',think:'',heart:'',imagine:''});
+  const [mixInput, setMixInput] = React.useState({
+    text:'', subType:'think',
+    premiseText:'', premiseSubType:'heart',
+  });
   const [toast, setToast] = React.useState(null);
   const [name, setName] = React.useState('');
   const [classInfo, setClassInfo] = React.useState('');
@@ -424,6 +601,40 @@ function V1({width=1100, height=1400}){
     showToast('붙였어요! 🎉');
   };
 
+  const addMixNote = (size) => {
+    const text = mixInput.text.trim();
+    const premiseText = mixInput.premiseText.trim();
+    if (!text || !premiseText) { showToast('전제와 질문을 모두 써주세요 ✍️'); return; }
+    if (text.length > V1_MAX_CHARS || premiseText.length > V1_MAX_CHARS) {
+      showToast(`너무 길어요! ${V1_MAX_CHARS}자 이내로 줄여주세요 ✂️`); return;
+    }
+    const tilt = (Math.random()*10 - 5).toFixed(1);
+    setNotes(n => {
+      const pos = nextPos(n, size);
+      return [...n, {
+        id: idRef.current++,
+        type: 'mix',
+        subType: mixInput.subType,
+        text,
+        premise: { subType: mixInput.premiseSubType, text: premiseText },
+        tilt, size: size||'M',
+        penColor:'#2d2a26', drawData:null,
+        x: pos.x, y: pos.y,
+      }];
+    });
+    setMixInput(v => ({...v, text:'', premiseText:''}));
+    showToast('붙였어요! 🎉');
+  };
+
+  const exampleForMix = () => {
+    const arr = V1_EXAMPLES({char1, char2}).mix;
+    const pick = arr[Math.floor(Math.random()*arr.length)];
+    setMixInput({
+      text: pick.text, subType: pick.subType,
+      premiseText: pick.premise.text, premiseSubType: pick.premise.subType,
+    });
+  };
+
   const addDrawNote = (type, canvasRef, size, penColor) => {
     if (!canvasRef.current?.isDirty()) { showToast('먼저 그림을 그려주세요 ✏️'); return; }
     const drawData = canvasRef.current.getDataURL();
@@ -495,16 +706,16 @@ function V1({width=1100, height=1400}){
   };
 
   const [activeModal, setActiveModal] = React.useState(null);
-  // null | { kind: 'text'|'draw', typeKey, noteSize, penColor }
+  // null | { kind: 'text'|'draw'|'mix', typeKey?, noteSize, penColor? }
   const [qrOpen, setQrOpen] = React.useState(false);
   const QR_URL = 'https://plusiam.github.io/question-canvas/v1.html';
 
-  const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
-  const allFour = V1_TYPES.every(t => counts[t.key] >= 1);
+  const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0,mix:0});
+  const allFour = V1_BASIC_TYPES.every(t => counts[t.key] >= 1);
 
   return (
     <div className="v1-root" style={{
-      width:'100%', maxWidth:width, minHeight:height, position:'relative',
+      width:'100%', maxWidth:width, minHeight:'auto', position:'relative',
       fontFamily:"'Noto Sans KR', sans-serif",
       background: `
         radial-gradient(circle at 8% 8%, #fff2c8 0 14%, transparent 15%),
@@ -588,9 +799,9 @@ function V1({width=1100, height=1400}){
         </div>
       </div>
 
-      {/* Question-type cards — 2x2 grid */}
+      {/* Question-type cards — 2x2 grid (기본 4타입) */}
       <div className="v1-type-grid qc-no-print" style={{marginTop:28, display:'grid', gridTemplateColumns:'1fr 1fr', gap:18}}>
-        {V1_TYPES.map(t => (
+        {V1_BASIC_TYPES.map(t => (
           <V1TypeCard key={t.key} type={t}
             value={inputs[t.key]}
             onChange={(v)=>setInputs(i=>({...i,[t.key]:v}))}
@@ -603,6 +814,16 @@ function V1({width=1100, height=1400}){
         ))}
       </div>
 
+      {/* 복합 질문 카드 — 전폭 */}
+      <div className="v1-mix-wrap qc-no-print" style={{marginTop:18}}>
+        <V1MixTypeCard
+          value={mixInput}
+          count={counts.mix||0}
+          onOpenMix={()=>setActiveModal({kind:'mix', noteSize:'M'})}
+          onExample={exampleForMix}
+        />
+      </div>
+
       {/* Board */}
       <div style={{marginTop:34}}>
         <div className="v1-board-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, flexWrap:'wrap', marginBottom:12}}>
@@ -610,12 +831,19 @@ function V1({width=1100, height=1400}){
             <span style={{fontSize:30}}>🎨</span> 내 질문 도화지
           </h2>
           <div style={{display:'flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
-            {V1_TYPES.map(t => (
+            {V1_BASIC_TYPES.map(t => (
               <span key={t.key} style={{
                 fontFamily:'Jua', fontSize:14, padding:'5px 12px', borderRadius:999,
                 background:t.soft, border:'2px solid #2d2a26',
               }}>{t.icon} {t.label.replace(' 질문','')} {counts[t.key]}</span>
             ))}
+            {counts.mix > 0 && (
+              <span style={{
+                fontFamily:'Jua', fontSize:14, padding:'5px 12px', borderRadius:999,
+                color:'#fff', border:'2px solid #2d2a26',
+                background: V1_MIX_TYPE.gradient,
+              }}>🌈 복합 {counts.mix}</span>
+            )}
             {allFour && (
               <span style={{
                 fontFamily:'Jua', fontSize:14, padding:'6px 14px', borderRadius:999,
@@ -653,6 +881,19 @@ function V1({width=1100, height=1400}){
       </div>
 
       {activeModal && (() => {
+        if (activeModal.kind === 'mix') return (
+          <V1MixModal
+            key="mix-modal"
+            open={true}
+            onClose={()=>setActiveModal(null)}
+            onConfirm={()=>{ addMixNote(activeModal.noteSize); setActiveModal(null); }}
+            onExample={exampleForMix}
+            value={mixInput}
+            onChange={setMixInput}
+            noteSize={activeModal.noteSize}
+            onSize={k=>setActiveModal(m=>({...m, noteSize:k}))}
+          />
+        );
         const t = V1_TYPES.find(x=>x.key===activeModal.typeKey);
         if (!t) return null;
         if (activeModal.kind === 'text') return (
@@ -686,39 +927,12 @@ function V1({width=1100, height=1400}){
 
       {toast && <V1Toast toast={toast} />}
 
-      {qrOpen && (
-        <div className="qc-no-print" onClick={()=>setQrOpen(false)} style={{
-          position:'fixed', inset:0, zIndex:2000,
-          background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:'#fff', borderRadius:24, border:'4px solid #2d2a26',
-            boxShadow:'0 8px 0 #2d2a26', padding:'28px 32px',
-            display:'flex', flexDirection:'column', alignItems:'center', gap:16,
-            maxWidth:'90vw',
-          }}>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', gap:20}}>
-              <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>📱 카툰 리파인 접속 QR</span>
-              <button onClick={()=>setQrOpen(false)} style={{
-                fontFamily:'Jua', fontSize:14, padding:'4px 14px', borderRadius:999,
-                border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
-              }}>닫기</button>
-            </div>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(QR_URL)}`}
-              alt="QR 코드"
-              width={280} height={280}
-              style={{border:'2px solid #e5ddc6', borderRadius:12}}
-            />
-            <p style={{fontFamily:'Gaegu', fontSize:17, color:'#7a7064', margin:0, textAlign:'center'}}>
-              카메라로 QR을 찍으면 바로 접속돼요!
-            </p>
-            <a href={QR_URL} style={{fontFamily:'Noto Sans KR', fontSize:12, color:'#aaa', wordBreak:'break-all', textDecoration:'none'}}>
-              {QR_URL}
-            </a>
-          </div>
-        </div>
-      )}
+      <QCShared.QRModal
+        open={qrOpen}
+        onClose={()=>setQrOpen(false)}
+        url={QR_URL}
+        title="카툰 리파인 접속 QR"
+      />
 
       <style>{`
         @keyframes v1pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
@@ -816,6 +1030,11 @@ function V1({width=1100, height=1400}){
           .v1-note.is-draw{
             height:auto !important;
             min-height:36mm !important;
+          }
+          /* 복합 질문 포스트잇 (전제+질문 2단 구조라 더 높음) */
+          .v1-note.is-mix{
+            height:auto !important;
+            min-height:60mm !important;
           }
         }
       `}</style>
@@ -926,9 +1145,108 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count, onOpenText,
   );
 }
 
+/* 복합 질문 카드 — 전폭, 그라데이션 보더 */
+function V1MixTypeCard({ value, count, onOpenMix, onExample }){
+  const [h, setH] = React.useState(false);
+  const [showDesc, setShowDesc] = React.useState(false);
+  const hasContent = value.text || value.premiseText;
+  const preType = V1_BASIC_TYPES.find(t=>t.key===value.premiseSubType) || V1_BASIC_TYPES[2];
+  const mainType = V1_BASIC_TYPES.find(t=>t.key===value.subType) || V1_BASIC_TYPES[1];
+
+  return (
+    <div style={{
+      position:'relative', padding:'4px', borderRadius:22,
+      background: V1_MIX_TYPE.gradient,
+      boxShadow: h ? '6px 6px 0 #2d2a26' : '4px 4px 0 #2d2a26',
+      transform: h ? 'translate(-2px,-2px)' : 'none',
+      transition:'all .15s',
+    }}
+    onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}>
+      <div style={{
+        background:'#fff', borderRadius:18, padding:'16px 20px',
+        display:'flex', flexDirection:'column', gap:12,
+      }}>
+        <span style={{
+          position:'absolute', top:14, right:18, fontFamily:'Jua', fontSize:13,
+          background:'#fff', border:'2px solid #2d2a26', borderRadius:999, padding:'2px 10px',
+        }}>{count}</span>
+
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          <div style={{
+            width:44, height:44, borderRadius:'50%',
+            background: V1_MIX_TYPE.gradient,
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:22,
+            border:'2px solid #2d2a26', flexShrink:0,
+          }}>🌈</div>
+          <h3 style={{fontFamily:'Jua', fontSize:22, margin:0}}>복합 질문</h3>
+          <span style={{
+            fontFamily:'Gaegu', fontSize:15, color:'#7a7064',
+          }}>전제 + 질문으로 섞어서</span>
+          <button onClick={()=>setShowDesc(v=>!v)} style={{
+            marginLeft:'auto', width:26, height:26, borderRadius:'50%',
+            border:`2px solid ${V1_MIX_TYPE.color}`,
+            background: showDesc ? V1_MIX_TYPE.color : '#fff',
+            color: showDesc ? '#fff' : V1_MIX_TYPE.color,
+            cursor:'pointer', fontFamily:'Jua', fontSize:14,
+            display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+          }}>?</button>
+        </div>
+
+        {showDesc && (
+          <div style={{
+            fontFamily:'Noto Sans KR', fontSize:13, color:'#2d2a26', lineHeight:1.6,
+            background:V1_MIX_TYPE.paper, border:`1.5px solid ${V1_MIX_TYPE.soft}`, borderRadius:8,
+            padding:'10px 14px',
+          }}>{V1_MIX_TYPE.desc}</div>
+        )}
+
+        {/* 미리보기 — 클릭하면 모달 */}
+        <div className="qc-no-print" onClick={onOpenMix} style={{
+          cursor:'text', display:'flex', flexDirection:'column', gap:6,
+        }}>
+          <div style={{
+            border:`2px dashed ${preType.soft}`, borderRadius:10, padding:'8px 12px',
+            background:preType.paper, minHeight:42,
+            fontFamily:'Gaegu', fontSize:17, color: value.premiseText ? '#2d2a26' : '#bbb',
+          }}>
+            <span style={{fontFamily:'Jua', fontSize:11, color:preType.color, marginRight:8}}>
+              {preType.icon} 전제
+            </span>
+            {value.premiseText || '어떤 상황·감정을 가정할까요?'}
+          </div>
+          <div style={{textAlign:'center', fontSize:16, color:'#999', lineHeight:1}}>↓</div>
+          <div style={{
+            border:`2px solid ${mainType.soft}`, borderRadius:10, padding:'8px 12px',
+            background:mainType.paper, minHeight:42,
+            fontFamily:'Gaegu', fontSize:17, color: value.text ? '#2d2a26' : '#bbb',
+          }}>
+            <span style={{fontFamily:'Jua', fontSize:11, color:mainType.color, marginRight:8}}>
+              {mainType.icon} 질문
+            </span>
+            {value.text || '그 위에서 무엇을 물어볼까요?'}
+          </div>
+        </div>
+
+        <div className="qc-no-print" style={{display:'flex', gap:8}}>
+          <button onClick={onExample} style={{
+            background:'#fff', border:'2px solid #d9c9a7', borderRadius:10, padding:'8px 12px',
+            fontSize:13, cursor:'pointer', color:'#7a7064', fontFamily:'Noto Sans KR', fontWeight:500,
+            whiteSpace:'nowrap',
+          }}>힌트 💡</button>
+          <button onClick={onOpenMix} style={{
+            flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
+            color:'#fff', cursor:'pointer', fontSize:16, background:V1_MIX_TYPE.color,
+          }}>{hasContent ? '이어서 편집 →' : '+ 복합 질문 만들기'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function V1Note({note, type, onDel, onUpdate, onMove}){
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.text);
+  const [draftPremise, setDraftPremise] = React.useState(note.premise?.text || '');
   const [draftType, setDraftType] = React.useState(note.type);
   const [draftSize, setDraftSize] = React.useState(note.size||'M');
   const [dragging, setDragging] = React.useState(false);
@@ -937,7 +1255,10 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
   const composing = React.useRef(false);
   const dragOffset = React.useRef({x:0, y:0});
   const isDrawNote = !!note.drawData;
+  const isMix = note.type === 'mix';
   const sz = V1_SIZES[note.size||'M'];
+  const mixMain = isMix ? (V1_BASIC_TYPES.find(t=>t.key===note.subType) || V1_BASIC_TYPES[1]) : null;
+  const mixPre  = isMix ? (V1_BASIC_TYPES.find(t=>t.key===note.premise?.subType) || V1_BASIC_TYPES[2]) : null;
 
   const onDragStart = (e) => {
     if(editing) return;
@@ -960,13 +1281,21 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
 
   const openEdit = () => {
     setDraft(note.text);
+    setDraftPremise(note.premise?.text || '');
     setDraftType(note.type);
     setDraftSize(note.size||'M');
     setEditing(true);
     if(!isDrawNote) setTimeout(()=>{ taRef.current?.focus(); taRef.current?.select(); }, 30);
   };
   const save = () => {
-    if(isDrawNote){
+    if(isMix){
+      const t = draft.trim();
+      const p = draftPremise.trim();
+      if(t && p) onUpdate({
+        text:t, size:draftSize,
+        premise: {...(note.premise||{subType:'heart'}), text:p},
+      });
+    } else if(isDrawNote){
       const newData = editDrawRef.current?.isDirty() ? editDrawRef.current.getDataURL() : note.drawData;
       onUpdate({text:'', type:draftType, drawData:newData, size:draftSize});
     } else {
@@ -982,22 +1311,30 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
     return (
       <div style={{position:'absolute', left: note.x ?? 28, top: note.y ?? 28, zIndex:200}}>
       <div className="v1-note qc-no-print" style={{
-        width: isDrawNote ? 310 : 220, padding:'12px 14px', borderRadius:10,
-        background:'#fff', border:`3px solid ${type.color}`,
+        width: isMix ? 300 : (isDrawNote ? 310 : 220), padding:'12px 14px', borderRadius:10,
+        background:'#fff', border:`3px solid ${curType.color}`,
         boxShadow:'4px 4px 0 #2d2a26', display:'flex', flexDirection:'column', gap:8,
         animation:'v1noteIn .2s ease',
       }}>
-        <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
-          {V1_TYPES.map(t=>(
-            <button key={t.key} onClick={()=>setDraftType(t.key)} style={{
-              fontFamily:'Jua', fontSize:11, padding:'2px 8px', borderRadius:999,
-              border:`2px solid ${t.color}`,
-              background: draftType===t.key ? t.color : '#fff',
-              color: draftType===t.key ? '#fff' : t.color,
-              cursor:'pointer',
-            }}>{t.icon} {t.label.replace(' 질문','')}</button>
-          ))}
-        </div>
+        {isMix ? (
+          <div style={{
+            fontFamily:'Jua', fontSize:12,
+            padding:'4px 10px', borderRadius:999, color:'#fff',
+            background: V1_MIX_TYPE.gradient, alignSelf:'flex-start',
+          }}>🌈 복합 질문</div>
+        ) : (
+          <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+            {V1_BASIC_TYPES.map(t=>(
+              <button key={t.key} onClick={()=>setDraftType(t.key)} style={{
+                fontFamily:'Jua', fontSize:11, padding:'2px 8px', borderRadius:999,
+                border:`2px solid ${t.color}`,
+                background: draftType===t.key ? t.color : '#fff',
+                color: draftType===t.key ? '#fff' : t.color,
+                cursor:'pointer',
+              }}>{t.icon} {t.label.replace(' 질문','')}</button>
+            ))}
+          </div>
+        )}
         <div style={{display:'flex', alignItems:'center', gap:6}}>
           <span style={{fontFamily:'Jua', fontSize:11, color:'#7a7064', minWidth:28}}>크기</span>
           {Object.entries(V1_SIZES).map(([k,v])=>(
@@ -1010,7 +1347,30 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
             }}>{v.label}</button>
           ))}
         </div>
-        {isDrawNote ? (
+        {isMix ? (
+          <>
+            <div style={{fontFamily:'Jua', fontSize:11, color:mixPre.color}}>{mixPre.icon} 전제</div>
+            <textarea value={draftPremise} onChange={e=>setDraftPremise(e.target.value)}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              onKeyDown={e=>{ if(e.key==='Escape') cancel(); }}
+              style={{
+                fontFamily:'Gaegu', fontSize:17, border:`2px solid ${mixPre.soft}`,
+                borderRadius:8, padding:'8px 10px', resize:'none', outline:'none',
+                minHeight:50, boxSizing:'border-box', width:'100%', background:mixPre.paper,
+              }}/>
+            <div style={{fontFamily:'Jua', fontSize:11, color:mixMain.color}}>{mixMain.icon} 질문</div>
+            <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
+              onCompositionStart={()=>{ composing.current=true; }}
+              onCompositionEnd={()=>{ composing.current=false; }}
+              onKeyDown={e=>{ if(e.key==='Escape') cancel(); }}
+              style={{
+                fontFamily:'Gaegu', fontSize:17, border:`2px solid ${mixMain.soft}`,
+                borderRadius:8, padding:'8px 10px', resize:'none', outline:'none',
+                minHeight:60, boxSizing:'border-box', width:'100%', background:mixMain.paper,
+              }}/>
+          </>
+        ) : isDrawNote ? (
           <V1DrawCanvas ref={editDrawRef} bgColor={curType.paper} penColor="#2d2a26" initialDataURL={note.drawData} />
         ) : (
           <textarea ref={taRef} value={draft} onChange={e=>setDraft(e.target.value)}
@@ -1043,7 +1403,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
   }
 
   return (
-    <div className={`v1-note${isDrawNote ? ' is-draw' : ''}`}
+    <div className={`v1-note${isDrawNote ? ' is-draw' : ''}${isMix ? ' is-mix' : ''}`}
       onPointerDown={onDragStart}
       onPointerMove={onDragMove}
       onPointerUp={onDragEnd}
@@ -1051,13 +1411,15 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
       style={{
         position:'absolute',
         left: note.x ?? 28, top: note.y ?? 28,
-        width: sz.width, minHeight: sz.minHeight, padding:'14px 16px 30px',
+        width: isMix ? Math.max(sz.width, 210) : sz.width,
+        minHeight: isMix ? Math.max(sz.minHeight, 170) : sz.minHeight,
+        padding:'14px 16px 30px',
         fontFamily:'Gamja Flower, Gaegu, sans-serif', fontSize: sz.fontSize, lineHeight:1.35,
         color: note.penColor && !isDrawNote ? note.penColor : '#2d2a26',
         boxShadow: dragging ? '6px 10px 20px rgba(62,48,30,.32)' : '3px 6px 12px rgba(62,48,30,.18)',
         wordBreak:'keep-all', overflowWrap:'anywhere', borderRadius:2,
         background:type.soft, transform:`rotate(${note.tilt}deg)${dragging?' scale(1.04)':''}`,
-        animation:'v1noteIn .3s ease', overflow:'hidden',
+        animation:'v1noteIn .3s ease', overflow: isMix ? 'visible' : 'hidden',
         cursor: dragging ? 'grabbing' : 'grab',
         zIndex: dragging ? 100 : 1,
         userSelect:'none', touchAction:'none',
@@ -1069,15 +1431,45 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
         background:'radial-gradient(circle at 30% 30%, #ff9a7a, #b3361f)',
         boxShadow:'0 2px 4px rgba(0,0,0,.3)',
       }} />
-      <span style={{
-        display:'inline-block', fontFamily:'Jua', fontSize:11, padding:'2px 8px',
-        borderRadius:999, color:'#fff', marginBottom:8, background:type.color,
-      }}>{type.label}</span>
-      {note.drawData
-        ? <img src={note.drawData} alt="손글씨 질문"
-            style={{display:'block', width:'100%', height:'auto', borderRadius:4, marginTop:2}}/>
-        : <div>{note.text}</div>
-      }
+      {isMix ? (
+        <>
+          <span style={{
+            display:'inline-block', fontFamily:'Jua', fontSize:11, padding:'2px 8px',
+            borderRadius:999, color:'#fff', marginBottom:6, background:V1_MIX_TYPE.gradient,
+          }}>🌈 복합</span>
+          <div style={{
+            fontSize:'0.82em', padding:'4px 8px', borderRadius:6, marginBottom:4,
+            background:mixPre.paper, border:`1px dashed ${mixPre.soft}`, lineHeight:1.3,
+          }}>
+            <span style={{fontFamily:'Jua', fontSize:'0.85em', color:mixPre.color, marginRight:4}}>
+              {mixPre.icon} 전제
+            </span>
+            {note.premise?.text}
+          </div>
+          <div style={{textAlign:'center', fontSize:12, color:'#999', margin:'0 0 2px'}}>↓</div>
+          <div style={{
+            padding:'4px 8px', borderRadius:6, lineHeight:1.3,
+            background:mixMain.paper, border:`1px solid ${mixMain.soft}`,
+          }}>
+            <span style={{fontFamily:'Jua', fontSize:'0.85em', color:mixMain.color, marginRight:4}}>
+              {mixMain.icon} 질문
+            </span>
+            {note.text}
+          </div>
+        </>
+      ) : (
+        <>
+          <span style={{
+            display:'inline-block', fontFamily:'Jua', fontSize:11, padding:'2px 8px',
+            borderRadius:999, color:'#fff', marginBottom:8, background:type.color,
+          }}>{type.label}</span>
+          {note.drawData
+            ? <img src={note.drawData} alt="손글씨 질문"
+                style={{display:'block', width:'100%', height:'auto', borderRadius:4, marginTop:2}}/>
+            : <div>{note.text}</div>
+          }
+        </>
+      )}
       <button onClick={openEdit} className="qc-no-print" style={{
         position:'absolute', bottom:6, left:8, border:'none', background:'transparent',
         fontSize:14, cursor:'pointer', color:'#7a7064', padding:'2px 6px', borderRadius:6,

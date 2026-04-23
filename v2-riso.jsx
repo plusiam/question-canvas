@@ -1,7 +1,9 @@
+const QCShared = window.QCShared;
+
 const V2_TYPES = [
   { key:'fact',    label:'사실',   sub:'FACT',    hint:'무엇일까?',       placeholder:'무엇을 물어보고 싶어요?',   color:'#4A7FB8', wash:'#FFE8A3', paper:'#E4EEF7' },
-  { key:'think',   label:'생각',   sub:'THINK',   hint:'왜 ~~~~?',        placeholder:'왜 그랬을지 궁금해요?',     color:'#D4902A', wash:'#FFC9B8', paper:'#FCEFD0' },
   { key:'heart',   label:'느낌',   sub:'FEELING', hint:'어떤 느낌?',      placeholder:'어떤 느낌이었을까요?',      color:'#C85A86', wash:'#C6E3CF', paper:'#F5DCE6' },
+  { key:'think',   label:'생각',   sub:'THINK',   hint:'왜 ~~~~?',        placeholder:'왜 그랬을지 궁금해요?',     color:'#D4902A', wash:'#FFC9B8', paper:'#FCEFD0' },
   { key:'imagine', label:'상상',   sub:'IMAGINE', hint:'만약에 ~~~~?',    placeholder:'만약에 ~하면 어떻게 될까?', color:'#6B5AAF', wash:'#FFE8A3', paper:'#E1D9EF' },
 ];
 
@@ -294,7 +296,7 @@ const V2DrawCanvas = React.forwardRef(function V2DrawCanvas({ bgColor='#FFF8ED',
   const clearAll = () => {
     const ctx = canvasEl.current.getContext('2d');
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, 280, 160);
+    ctx.fillRect(0, 0, W, H);
     isDirtyRef.current = false;
   };
 
@@ -509,7 +511,7 @@ function V2({width=1100, height=1400}){
 
   return (
     <div className="v2-root" style={{
-      width, minHeight:height, position:'relative',
+      width:'100%', maxWidth:width, minHeight:'auto', position:'relative',
       fontFamily:"'Noto Sans KR', sans-serif", color:'#3C2F2A',
       background:'#F4EBD9', padding:'40px 44px 60px', boxSizing:'border-box',
     }}>
@@ -547,7 +549,7 @@ function V2({width=1100, height=1400}){
           <div style={{fontFamily:'Gaegu', fontSize:20, color:'#8A6F5E'}}>오려 붙이는 질문 만들기</div>
         </div>
         <p style={{fontFamily:'Gaegu', fontSize:19, color:'#6B5445', margin:'6px 0 16px'}}>
-          이야기 속 두 인물에게 궁금한 걸 오려 붙여봐요 — 사실, 생각, 느낌, 상상!
+          이야기 속 두 인물에게 궁금한 걸 오려 붙여봐요 — 사실, 느낌, 생각, 상상!
         </p>
         <div style={{display:'flex', gap:18, flexWrap:'wrap'}}>
           <V2Field label="이름" value={name} onChange={setName} width={150} />
@@ -567,7 +569,7 @@ function V2({width=1100, height=1400}){
           <span style={{fontFamily:'Jua', fontSize:13, background:'#3C2F2A', color:'#FFF6E1', padding:'3px 10px'}}>STORY</span>
           <h2 style={{fontFamily:'Jua', fontSize:22, margin:0}}>오늘의 이야기</h2>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 2.2fr', gap:14}}>
+        <div className="v2-story-grid" style={{display:'grid', gridTemplateColumns:'1fr 1fr 2.2fr', gap:14}}>
           <V2Input label="인물 ①" value={char1} onChange={setChar1}/>
           <V2Input label="인물 ②" value={char2} onChange={setChar2}/>
           <V2Input label="어떤 상황?" value={situation} onChange={setSituation}/>
@@ -680,42 +682,46 @@ function V2({width=1100, height=1400}){
 
       {toast && <V2Toast toast={toast} />}
 
-      {qrOpen && (
-        <div className="qc-no-print" onClick={()=>setQrOpen(false)} style={{
-          position:'fixed', inset:0, zIndex:2000,
-          background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:'#FFF8ED', border:'2px solid #3C2F2A',
-            boxShadow:'6px 6px 0 #3C2F2A', padding:'28px 32px', position:'relative',
-            display:'flex', flexDirection:'column', alignItems:'center', gap:16,
-            maxWidth:'90vw',
-          }}>
-            <V2Tape color="#FFE8A3" rotate={-2} width={110} top={-11} left={40}/>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', gap:20}}>
-              <span style={{fontFamily:'Jua', fontSize:20, color:'#3C2F2A'}}>📱 질문 공방 접속 QR</span>
-              <button onClick={()=>setQrOpen(false)} style={{
-                fontFamily:'Jua', fontSize:13, padding:'4px 14px',
-                border:'1.5px solid #3C2F2A', background:'transparent', color:'#3C2F2A', cursor:'pointer',
-              }}>닫기</button>
-            </div>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(QR_URL)}`}
-              alt="QR 코드"
-              width={280} height={280}
-              style={{border:'1.5px solid #C8A882'}}
-            />
-            <p style={{fontFamily:'Gaegu', fontSize:17, color:'#6B5445', margin:0, textAlign:'center'}}>
-              카메라로 QR을 찍으면 바로 접속돼요!
-            </p>
-            <a href={QR_URL} style={{fontFamily:'Noto Sans KR', fontSize:12, color:'#aaa', wordBreak:'break-all', textDecoration:'none'}}>
-              {QR_URL}
-            </a>
-          </div>
-        </div>
-      )}
+      <QCShared.QRModal
+        open={qrOpen}
+        onClose={()=>setQrOpen(false)}
+        url={QR_URL}
+        title="질문 공방 접속 QR"
+        theme={{
+          boxStyle:{
+            background:'#FFF8ED', borderRadius:0, border:'2px solid #3C2F2A',
+            boxShadow:'6px 6px 0 #3C2F2A',
+          },
+          titleColor:'#3C2F2A',
+          closeBtnStyle:{
+            fontSize:13, borderRadius:0, border:'1.5px solid #3C2F2A',
+            background:'transparent', color:'#3C2F2A',
+          },
+          imgStyle:{ border:'1.5px solid #C8A882', borderRadius:0 },
+          hintColor:'#6B5445',
+          decoration:<V2Tape color="#FFE8A3" rotate={-2} width={110} top={-11} left={40}/>,
+        }}
+      />
 
       <style>{`
+        /* 태블릿 (≤768px): 2열 카드 → 1열 */
+        @media(max-width:768px){
+          .v2-root{padding:20px 16px 40px !important}
+          .v2-cards{grid-template-columns:1fr !important; gap:14px !important}
+          .v2-header{padding:18px 20px !important}
+          .v2-header h1{font-size:28px !important}
+          .v2-story{padding:12px 16px !important}
+          .v2-story-grid{grid-template-columns:1fr !important}
+        }
+        /* 모바일 (≤480px) */
+        @media(max-width:480px){
+          .v2-root{padding:14px 10px 32px !important}
+          .v2-header{padding:14px 14px !important}
+          .v2-header h1{font-size:22px !important}
+          .v2-note-wrap{width:150px !important}
+          .v2-note-inner{font-size:14px !important; min-height:110px !important}
+        }
+
         @media print {
           @page { margin: 10mm 10mm; size: A4 portrait; }
 

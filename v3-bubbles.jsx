@@ -1,13 +1,15 @@
+const QCShared = window.QCShared;
+
 const V3_TYPES = [
   { key:'fact',    label:'사실',  icon:'🔍', placeholder:'무엇이 궁금해요?',
     prompt:'무엇 · 언제 · 누가 · 어디서', color:'#3FA9F5', deep:'#1E6FB8',
     mouth:'straight', eyeStyle:'round' },
-  { key:'think',   label:'생각',  icon:'💭', placeholder:'왜 그랬을지 궁금해요?',
-    prompt:'왜 · 어떻게 · 무슨 까닭', color:'#F5C03F', deep:'#B8881E',
-    mouth:'smile', eyeStyle:'sparkle' },
   { key:'heart',   label:'느낌',  icon:'💗', placeholder:'어떤 느낌이었을까요?',
     prompt:'느낌 · 기분 · 마음', color:'#F06AA3', deep:'#B83E74',
     mouth:'warm', eyeStyle:'curved' },
+  { key:'think',   label:'생각',  icon:'💭', placeholder:'왜 그랬을지 궁금해요?',
+    prompt:'왜 · 어떻게 · 무슨 까닭', color:'#F5C03F', deep:'#B8881E',
+    mouth:'smile', eyeStyle:'sparkle' },
   { key:'imagine', label:'상상',  icon:'✨', placeholder:'만약에 ~하면?',
     prompt:'만약에 · 혹시 · 그랬다면', color:'#A879E8', deep:'#6F4CB8',
     mouth:'open', eyeStyle:'star' },
@@ -286,7 +288,7 @@ const V3DrawCanvas = React.forwardRef(function V3DrawCanvas({ bgColor='#fff', pe
   const clearAll = () => {
     const ctx = canvasEl.current.getContext('2d');
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, 280, 160);
+    ctx.fillRect(0, 0, W, H);
     isDirtyRef.current = false;
   };
 
@@ -544,7 +546,7 @@ function V3({width=1100, height=1400}){
 
   return (
     <div className="v3-root" style={{
-      width, minHeight:height, position:'relative',
+      width:'100%', maxWidth:width, minHeight:'auto', position:'relative',
       fontFamily:"'Noto Sans KR', sans-serif", color:'#2d2a26',
       background: 'linear-gradient(180deg, #C7E9FF 0%, #FFF3D0 55%, #FFDDE9 100%)',
       padding:'36px 44px 60px', boxSizing:'border-box', overflow:'hidden',
@@ -623,7 +625,7 @@ function V3({width=1100, height=1400}){
       </div>
 
       {/* The 4 character bubbles */}
-      <div className="qc-no-print" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14}}>
+      <div className="v3-type-grid qc-no-print" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14}}>
         {V3_TYPES.map((t,i) => (
           <V3Character key={t.key} type={t} idx={i}
             value={inputs[t.key]}
@@ -730,44 +732,38 @@ function V3({width=1100, height=1400}){
 
       {toast && <V3Toast toast={toast}/>}
 
-      {qrOpen && (
-        <div className="qc-no-print" onClick={()=>setQrOpen(false)} style={{
-          position:'fixed', inset:0, zIndex:2000,
-          background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:'#fff', borderRadius:24, border:'4px solid #2d2a26',
-            boxShadow:'0 10px 0 #A879E8', padding:'28px 32px',
-            display:'flex', flexDirection:'column', alignItems:'center', gap:16,
-            maxWidth:'90vw',
-          }}>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', gap:20}}>
-              <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>📱 질문 풍선 놀이터 접속 QR</span>
-              <button onClick={()=>setQrOpen(false)} style={{
-                fontFamily:'Jua', fontSize:14, padding:'4px 14px', borderRadius:999,
-                border:'2px solid #ddd', background:'#f5f5f5', cursor:'pointer',
-              }}>닫기</button>
-            </div>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(QR_URL)}`}
-              alt="QR 코드"
-              width={280} height={280}
-              style={{border:'2px solid #2d2a26', borderRadius:12}}
-            />
-            <p style={{fontFamily:'Gaegu', fontSize:17, color:'#7a7064', margin:0, textAlign:'center'}}>
-              카메라로 QR을 찍으면 바로 접속돼요!
-            </p>
-            <a href={QR_URL} style={{fontFamily:'Noto Sans KR', fontSize:12, color:'#aaa', wordBreak:'break-all', textDecoration:'none'}}>
-              {QR_URL}
-            </a>
-          </div>
-        </div>
-      )}
+      <QCShared.QRModal
+        open={qrOpen}
+        onClose={()=>setQrOpen(false)}
+        url={QR_URL}
+        title="질문 풍선 놀이터 접속 QR"
+        theme={{
+          boxStyle:{ boxShadow:'0 10px 0 #A879E8' },
+          imgStyle:{ border:'2px solid #2d2a26' },
+        }}
+      />
 
       <style>{`
         @keyframes v3pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
         @keyframes v3float{0%,100%{transform:translateY(0) rotate(var(--t,0deg))}50%{transform:translateY(-4px) rotate(var(--t,0deg))}}
         @keyframes v3bubblein{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+
+        /* 태블릿 (≤768px): 4열 → 2열 */
+        @media(max-width:768px){
+          .v3-root{padding:20px 16px 40px !important}
+          .v3-type-grid{grid-template-columns:1fr 1fr !important; gap:12px !important}
+          .v3-name-story{grid-template-columns:1fr !important}
+          .v3-header h1{font-size:30px !important}
+          .v3-board-inner{min-height:340px !important}
+        }
+        /* 모바일 (≤480px): 4열 → 1열 */
+        @media(max-width:480px){
+          .v3-root{padding:14px 10px 32px !important}
+          .v3-type-grid{grid-template-columns:1fr !important}
+          .v3-header h1{font-size:24px !important}
+          .v3-bubble{width:140px !important; min-height:120px !important; font-size:13px !important}
+        }
+
         @media print{
           @page{margin:10mm 10mm;size:A4 portrait}
           .qc-no-print{display:none !important}

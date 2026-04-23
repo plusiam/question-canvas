@@ -95,6 +95,22 @@
   .card-v2 .card-accent{ background:#e8305a; }
   .card-v3 .card-accent{ background:#3b9eff; }
 
+  /* 학년 배지 — 카드 우상단 */
+  .card-grade{
+    position:absolute;
+    top:16px; right:16px;
+    font-family:'Jua', sans-serif;
+    font-size:12.5px;
+    padding:5px 12px;
+    border-radius:100px;
+    letter-spacing:0.02em;
+    border:2px solid #111;
+    z-index:2;
+  }
+  .card-v1 .card-grade{ background:#f5c842; color:#111; }
+  .card-v2 .card-grade{ background:#e8305a; color:#fff; }
+  .card-v3 .card-grade{ background:#3b9eff; color:#fff; }
+
   .card-icon{
     font-size:52px;
     margin-bottom:16px;
@@ -253,49 +269,52 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') closeQR(); });
 <div class="page">
   <header class="header">
     <div class="header-badge">질문 만들기 학습지</div>
-    <h1>어떤 스타일로 시작할까요?</h1>
-    <p>수업 분위기와 학생 성향에 맞는 스타일을 골라보세요.<br>사실·생각·느낌·상상 4가지 질문을 함께 만들어요.</p>
+    <h1>학년에 맞게 골라보세요</h1>
+    <p>저학년부터 고학년까지, 발달 단계에 맞춰 세 가지 스타일을 준비했어요.<br>사실·느낌·생각·상상 질문을 함께 만들어봐요.</p>
   </header>
 
   <div class="cards">
-    <a href="v1.html" class="card card-v1">
+    <a href="v3.html" class="card card-v3">
       <div class="card-accent"></div>
-      <div class="card-icon">🤔</div>
-      <div class="card-label">STYLE 01</div>
-      <div class="card-title">카툰 리파인</div>
-      <div class="card-desc">깔끔하고 선명한 카툰 스타일. 글씨가 잘 읽히고 정리된 느낌이 좋은 수업에 잘 맞아요.</div>
+      <div class="card-grade">1-2학년</div>
+      <div class="card-icon">🎈</div>
+      <div class="card-label">첫 질문하기</div>
+      <div class="card-title">질문 풍선 놀이터</div>
+      <div class="card-desc">큰 글씨와 귀여운 캐릭터, 풍선 말풍선으로 놀이처럼 질문을 만들어요. 처음 질문하기를 배우는 아이들에게 딱!</div>
       <div class="card-tags">
-        <span class="tag">단정함</span>
-        <span class="tag">가독성 좋음</span>
-        <span class="tag">전 학년</span>
+        <span class="tag">쉬움</span>
+        <span class="tag">놀이처럼</span>
+        <span class="tag">캐릭터</span>
       </div>
       <button class="card-btn">시작하기 →</button>
     </a>
 
     <a href="v2.html" class="card card-v2">
       <div class="card-accent"></div>
+      <div class="card-grade">3-4학년</div>
       <div class="card-icon">✂️</div>
-      <div class="card-label">STYLE 02</div>
+      <div class="card-label">창의 표현</div>
       <div class="card-title">질문 공방</div>
-      <div class="card-desc">리소·스크랩북 감성. 오리고 붙이는 듯한 독특한 분위기로 창의적인 수업에 어울려요.</div>
+      <div class="card-desc">리소·스크랩북 감성으로 오리고 붙이듯 개성 있게 꾸며요. 자기 표현이 피어나는 시기에 창의적인 질문 만들기!</div>
       <div class="card-tags">
-        <span class="tag">개성 있음</span>
-        <span class="tag">스크랩북</span>
-        <span class="tag">고학년</span>
+        <span class="tag">창의적</span>
+        <span class="tag">꾸미기</span>
+        <span class="tag">개성</span>
       </div>
       <button class="card-btn">시작하기 →</button>
     </a>
 
-    <a href="v3.html" class="card card-v3">
+    <a href="v1.html" class="card card-v1">
       <div class="card-accent"></div>
-      <div class="card-icon">🎈</div>
-      <div class="card-label">STYLE 03</div>
-      <div class="card-title">질문 풍선 놀이터</div>
-      <div class="card-desc">귀여운 캐릭터와 풍선 말풍선. 활동적이고 밝은 분위기로 저학년에 특히 잘 맞아요.</div>
+      <div class="card-grade">5-6학년</div>
+      <div class="card-icon">🤔</div>
+      <div class="card-label">심화 사고</div>
+      <div class="card-title">카툰 리파인</div>
+      <div class="card-desc">단정한 카툰 스타일에 <b>🌈 복합 질문</b>(전제+질문)까지. 깊이 있는 사고와 심화 토론에 어울려요.</div>
       <div class="card-tags">
-        <span class="tag">귀여움</span>
-        <span class="tag">캐릭터</span>
-        <span class="tag">저학년</span>
+        <span class="tag">심화</span>
+        <span class="tag">복합 질문</span>
+        <span class="tag">단정함</span>
       </div>
       <button class="card-btn">시작하기 →</button>
     </a>
