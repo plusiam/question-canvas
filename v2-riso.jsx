@@ -497,6 +497,8 @@ function V2({width=1100, height=1400}){
 
   const [activeModal, setActiveModal] = React.useState(null);
   // null | { kind: 'text'|'draw', typeKey, noteSize, penColor }
+  const [qrOpen, setQrOpen] = React.useState(false);
+  const QR_URL = 'https://plusiam.github.io/question-canvas/v2.html';
 
   const counts = notes.reduce((m,n)=>{m[n.type]=(m[n.type]||0)+1; return m;}, {fact:0,think:0,heart:0,imagine:0});
   const allFour = V2_TYPES.every(t => counts[t.key] >= 1);
@@ -530,6 +532,15 @@ function V2({width=1100, height=1400}){
           onMouseOver={e=>e.currentTarget.style.background='#E4D4BC'}
           onMouseOut={e=>e.currentTarget.style.background='#F0E4D0'}
           >← 홈으로</a>
+          <button className="qc-no-print" onClick={()=>setQrOpen(true)} title="QR 코드로 접속" style={{
+            display:'inline-flex', alignItems:'center', gap:5,
+            fontFamily:'Jua', fontSize:13, color:'#6B5445', cursor:'pointer',
+            background:'#F0E4D0', border:'2px solid #C8A882', borderRadius:100,
+            padding:'4px 12px', marginBottom:6, alignSelf:'flex-start', transition:'background 0.12s',
+          }}
+          onMouseOver={e=>e.currentTarget.style.background='#E4D4BC'}
+          onMouseOut={e=>e.currentTarget.style.background='#F0E4D0'}
+          >📱 QR</button>
           <h1 style={{fontFamily:'Jua', fontSize:44, margin:0, letterSpacing:'-0.02em', color:'#3C2F2A'}}>
             질문 공방 <span style={{fontSize:32}}>✂️</span>
           </h1>
@@ -668,6 +679,42 @@ function V2({width=1100, height=1400}){
       })()}
 
       {toast && <V2Toast toast={toast} />}
+
+      {qrOpen && (
+        <div className="qc-no-print" onClick={()=>setQrOpen(false)} style={{
+          position:'fixed', inset:0, zIndex:2000,
+          background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:'#FFF8ED', border:'2px solid #3C2F2A',
+            boxShadow:'6px 6px 0 #3C2F2A', padding:'28px 32px', position:'relative',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:16,
+            maxWidth:'90vw',
+          }}>
+            <V2Tape color="#FFE8A3" rotate={-2} width={110} top={-11} left={40}/>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', gap:20}}>
+              <span style={{fontFamily:'Jua', fontSize:20, color:'#3C2F2A'}}>📱 질문 공방 접속 QR</span>
+              <button onClick={()=>setQrOpen(false)} style={{
+                fontFamily:'Jua', fontSize:13, padding:'4px 14px',
+                border:'1.5px solid #3C2F2A', background:'transparent', color:'#3C2F2A', cursor:'pointer',
+              }}>닫기</button>
+            </div>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(QR_URL)}`}
+              alt="QR 코드"
+              width={280} height={280}
+              style={{border:'1.5px solid #C8A882'}}
+            />
+            <p style={{fontFamily:'Gaegu', fontSize:17, color:'#6B5445', margin:0, textAlign:'center'}}>
+              카메라로 QR을 찍으면 바로 접속돼요!
+            </p>
+            <a href={QR_URL} style={{fontFamily:'Noto Sans KR', fontSize:12, color:'#aaa', wordBreak:'break-all', textDecoration:'none'}}>
+              {QR_URL}
+            </a>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media print {
           @page { margin: 10mm 10mm; size: A4 portrait; }
