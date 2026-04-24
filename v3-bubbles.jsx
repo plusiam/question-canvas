@@ -1,28 +1,53 @@
 const QCShared = window.QCShared;
 
 const V3_TYPES = [
-  { key:'fact',    label:'사실',  icon:'🔍', placeholder:'무엇이 궁금해요?',
+  { key:'fact',    label:'사실',  icon:'🔍', placeholder:'이야기에서 무엇이 있었나요?',
     prompt:'무엇 · 언제 · 누가 · 어디서', color:'#3FA9F5', deep:'#1E6FB8',
-    mouth:'straight', eyeStyle:'round' },
-  { key:'heart',   label:'느낌',  icon:'💗', placeholder:'어떤 느낌이었을까요?',
+    mouth:'straight', eyeStyle:'round',
+    seeds: ['누가 나왔나요?', '무슨 일이 있었나요?', '언제·어디서 일어났나요?'],
+    subHints: ['🔍 한 곳에서 찾아요', '🧩 여러 곳을 모아봐요'],
+    hintTip: '이야기 속에 답이 있어요. 찾아서 질문을 만들어봐요!' },
+  { key:'heart',   label:'느낌',  icon:'💗', placeholder:'이야기 친구는 어떤 기분이었을까요?',
     prompt:'느낌 · 기분 · 마음', color:'#F06AA3', deep:'#B83E74',
-    mouth:'warm', eyeStyle:'curved' },
+    mouth:'warm', eyeStyle:'curved',
+    seeds: ['이야기 친구는 어떤 기분이었을까요?', '나는 어떤 느낌이 들었나요?', '왜 그런 느낌이 들었나요?'],
+    subHints: ['💗 이야기 친구의 느낌', '🙋 나의 느낌'],
+    hintTip: '이야기 속 표현에서 근거를 찾아봐요. "~했으니까 ~한 기분이야!"' },
   { key:'think',   label:'생각',  icon:'💭', placeholder:'왜 그랬을지 궁금해요?',
     prompt:'왜 · 어떻게 · 무슨 까닭', color:'#F5C03F', deep:'#B8881E',
-    mouth:'smile', eyeStyle:'sparkle' },
-  { key:'imagine', label:'상상',  icon:'✨', placeholder:'만약에 ~하면?',
+    mouth:'smile', eyeStyle:'sparkle',
+    seeds: ['왜 그랬을까요?', '어떻게 생각해요?', '만약 다르게 했다면?'],
+    subHints: ['🔎 이유를 찾아봐요', '🗣️ 내 생각을 말해봐요'],
+    hintTip: '정답이 없어도 괜찮아요. 내 생각을 자유롭게 써봐요!' },
+  { key:'imagine', label:'상상',  icon:'✨', placeholder:'만약에 ~하면 어떻게 될까요?',
     prompt:'만약에 · 혹시 · 그랬다면', color:'#A879E8', deep:'#6F4CB8',
-    mouth:'open', eyeStyle:'star' },
+    mouth:'open', eyeStyle:'star',
+    seeds: ['이야기 안: 만약에 ~라면?', '내 삶: 나도 이런 경험이 있어요?', '이야기가 계속 이어진다면?'],
+    subHints: ['📖 이야기 안을 상상해요', '🌍 내 삶과 연결해요'],
+    hintTip: '어디서 그런 상상이 떠올랐나요? 이야기 속 어느 부분인지 말해봐요!' },
 ];
 
 const V3_EXAMPLES = (c) => {
-  const a = c.char1 || '이 친구';
-  const b = c.char2 || '저 친구';
+  const a = c.char1 || '이야기 속 주인공';
+  const b = c.char2 || '친구';
+  const title = c.title || '이 이야기';
   return {
-    fact:   [`${a}는 무엇을 했나요?`, `두 사람 사이에 어떤 일이 있었나요?`],
-    think:  [`${a}는 왜 그랬을까요?`, `${b}는 왜 그런 말을 했을까요?`],
-    heart:  [`${a}는 어떤 느낌이었을까요?`, `${b}의 기분은 어땠을까요?`],
-    imagine:[`만약에 ${a}가 다르게 행동했다면 어땠을까요?`, `만약에 내가 ${a}라면?`],
+    fact:   [
+      `${title}에서 ${a}는 무엇을 했나요?`,
+      `${a}와 ${b} 사이에 어떤 일이 있었나요?`,
+    ],
+    heart:  [
+      `${a}는 그때 어떤 기분이었을까요?`,
+      `이 장면을 읽고 나는 어떤 느낌이 들었나요?`,
+    ],
+    think:  [
+      `${a}는 왜 그랬을까요?`,
+      `${title}에서 가장 인상 깊었던 부분은 왜일까요?`,
+    ],
+    imagine:[
+      `만약에 ${a}가 다르게 행동했다면 어떻게 됐을까요?`,
+      `나도 ${a}처럼 이런 경험을 한 적이 있나요?`,
+    ],
   };
 };
 
@@ -152,11 +177,29 @@ function V3TextModal({ open, onClose, onConfirm, onExample, value, onChange, typ
             color: over?'#D63384':'#aaa', fontWeight: over?700:400,
           }}>{value.length}/{V3_MAX_CHARS}</span>
         </div>
+        {type.seeds && (
+          <div style={{background:`${type.color}22`, border:`2px solid ${type.color}`, borderRadius:12, padding:'10px 14px'}}>
+            <div style={{fontFamily:'Jua', fontSize:12, color:type.deep, marginBottom:6}}>{type.hintTip}</div>
+            <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:8}}>
+              {type.subHints.map((h,i) => (
+                <span key={i} style={{fontSize:11, background:'#fff', color:type.deep, borderRadius:999, padding:'2px 8px', border:`1px solid ${type.color}`}}>{h}</span>
+              ))}
+            </div>
+            <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+              {type.seeds.map((s,i) => (
+                <button key={i} onClick={()=>onChange(s)} style={{
+                  fontFamily:'Gaegu', fontSize:13, background:'#fff', border:`1.5px solid ${type.color}`,
+                  borderRadius:8, padding:'4px 10px', color:'#2d2a26', cursor:'pointer',
+                }}>{s}</button>
+              ))}
+              <button onClick={onExample} style={{
+                fontFamily:'Jua', fontSize:12, background:type.color, border:'none',
+                borderRadius:8, padding:'4px 10px', color:'#fff', cursor:'pointer',
+              }}>🎲 랜덤</button>
+            </div>
+          </div>
+        )}
         <div style={{display:'flex', gap:8}}>
-          <button onClick={onExample} style={{
-            background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'10px 12px',
-            fontSize:13, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26', whiteSpace:'nowrap',
-          }}>💡 힌트</button>
           <button onClick={handleConfirm} style={{
             flex:1, fontFamily:'Jua', padding:'12px 14px', border:'2px solid #2d2a26', borderRadius:12,
             color:'#2d2a26', cursor:'pointer', fontSize:17, background:'#fff',
@@ -393,6 +436,7 @@ function V3({width=1100, height=1400}){
   const [toast, setToast] = React.useState(null);
   const [name, setName] = React.useState('');
   const [classInfo, setClassInfo] = React.useState('');
+  const [title, setTitle] = React.useState('');
   const [char1, setChar1] = React.useState('예은');
   const [char2, setChar2] = React.useState('친구');
   const [situation, setSituation] = React.useState('자기 생각을 당당히 말하지 못한 일');
@@ -407,6 +451,7 @@ function V3({width=1100, height=1400}){
       if (raw) {
         const s = JSON.parse(raw);
         if (Array.isArray(s.notes)) setNotes(s.notes);
+        if (typeof s.title === 'string') setTitle(s.title);
         if (typeof s.char1 === 'string') setChar1(s.char1);
         if (typeof s.char2 === 'string') setChar2(s.char2);
         if (typeof s.situation === 'string') setSituation(s.situation);
@@ -424,7 +469,7 @@ function V3({width=1100, height=1400}){
     if (!hydrated) return;
     try {
       localStorage.setItem(V3_STORAGE_KEY, JSON.stringify({
-        notes, char1, char2, situation, nextId: idRef.current,
+        notes, title, char1, char2, situation, nextId: idRef.current,
       }));
       sessionStorage.setItem('qc-v3-name', name);
       sessionStorage.setItem('qc-v3-class', classInfo);
@@ -437,7 +482,7 @@ function V3({width=1100, height=1400}){
         } catch {}
       }
     }
-  }, [hydrated, notes, name, classInfo, char1, char2, situation]);
+  }, [hydrated, notes, name, classInfo, title, char1, char2, situation]);
 
   const showToast = (msg, action) => {
     setToast({msg, action});
@@ -513,7 +558,7 @@ function V3({width=1100, height=1400}){
   }, []);
 
   const exampleFor = (type) => {
-    const arr = V3_EXAMPLES({char1, char2})[type];
+    const arr = V3_EXAMPLES({char1, char2, title})[type];
     setInputs(i => ({...i, [type]: arr[Math.floor(Math.random()*arr.length)]}));
   };
   const clearAll = () => {
@@ -585,7 +630,7 @@ function V3({width=1100, height=1400}){
             <span style={{fontSize:44}}>🎈</span> 질문 풍선 놀이터
           </h1>
           <p style={{fontFamily:'Gaegu', fontSize:20, color:'#7a7064', margin:'6px 0 0'}}>
-            네 친구와 함께 이야기 속 궁금한 걸 물어봐요!
+            사실 → 느낌 → 생각 → 상상, 네 친구가 도와줘요!
           </p>
           <div style={{position:'absolute', bottom:-18, left:'50%', transform:'translateX(-50%)',
             width:0, height:0, borderLeft:'16px solid transparent', borderRight:'16px solid transparent',
@@ -604,7 +649,7 @@ function V3({width=1100, height=1400}){
           <div style={{display:'flex', gap:10}}>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="이름"
               style={{fontFamily:'Gaegu', fontSize:20, flex:1, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent'}}/>
-            <input value={classInfo} onChange={e=>setClassInfo(e.target.value)} placeholder="4학년 2반"
+            <input value={classInfo} onChange={e=>setClassInfo(e.target.value)} placeholder="2학년 1반"
               style={{fontFamily:'Gaegu', fontSize:20, width:100, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent'}}/>
           </div>
         </div>
@@ -612,34 +657,52 @@ function V3({width=1100, height=1400}){
           boxShadow:'4px 4px 0 #2d2a26'}}>
           <div style={{fontFamily:'Jua', fontSize:14, color:'#7a7064', marginBottom:6}}>📖 오늘 이야기</div>
           <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <span style={{fontFamily:'Gaegu', fontSize:18, color:'#7a7064'}}>제목</span>
+            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="글·시 제목"
+              style={{fontFamily:'Gaegu', fontSize:20, width:130, border:'none', borderBottom:'2px dashed #3FA9F5', outline:'none', padding:'2px 6px', background:'transparent'}}/>
+            <span style={{fontFamily:'Gaegu', fontSize:18, color:'#7a7064'}}>|</span>
             <input value={char1} onChange={e=>setChar1(e.target.value)}
-              style={{fontFamily:'Gaegu', fontSize:20, width:80, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent', textAlign:'center'}}/>
+              style={{fontFamily:'Gaegu', fontSize:20, width:70, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent', textAlign:'center'}}/>
             <span style={{fontFamily:'Gaegu', fontSize:18, color:'#7a7064'}}>와</span>
             <input value={char2} onChange={e=>setChar2(e.target.value)}
-              style={{fontFamily:'Gaegu', fontSize:20, width:80, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent', textAlign:'center'}}/>
+              style={{fontFamily:'Gaegu', fontSize:20, width:70, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent', textAlign:'center'}}/>
             <span style={{fontFamily:'Gaegu', fontSize:18, color:'#7a7064'}}>의</span>
             <input value={situation} onChange={e=>setSituation(e.target.value)}
-              style={{fontFamily:'Gaegu', fontSize:20, flex:1, minWidth:180, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent'}}/>
+              style={{fontFamily:'Gaegu', fontSize:20, flex:1, minWidth:130, border:'none', borderBottom:'2px dashed #2d2a26', outline:'none', padding:'2px 6px', background:'transparent'}}/>
           </div>
         </div>
       </div>
 
+      {/* Cycle guide label */}
+      <div className="qc-no-print" style={{position:'relative', zIndex:2, display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:8}}>
+        <span style={{fontFamily:'Jua', fontSize:12, color:'#7a7064', background:'rgba(255,255,255,.7)', borderRadius:999, padding:'3px 14px', border:'1.5px dashed #ccc'}}>
+          어느 질문에서 시작해도 괜찮아요 — 서로 이어져요! 🔄
+        </span>
+      </div>
+
       {/* The 4 character bubbles */}
-      <div className="v3-type-grid qc-no-print" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14}}>
+      <div className="v3-type-grid qc-no-print" style={{position:'relative', zIndex:2, display:'grid', gridTemplateColumns:'1fr auto 1fr auto 1fr auto 1fr', gap:0, alignItems:'start'}}>
         {V3_TYPES.map((t,i) => (
-          <V3Character key={t.key} type={t} idx={i}
-            value={inputs[t.key]}
-            onChange={v=>setInputs(s=>({...s,[t.key]:v}))}
-            onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
-            onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
-            onExample={()=>exampleFor(t.key)}
-            count={counts[t.key]}
-            focused={focused===t.key}
-            onFocus={()=>setFocused(t.key)}
-            onBlur={()=>setFocused(null)}
-            onOpenText={(noteSize, penColor)=>setActiveModal({kind:'text', typeKey:t.key, noteSize, penColor})}
-            onOpenDraw={(noteSize, penColor)=>setActiveModal({kind:'draw', typeKey:t.key, noteSize, penColor})}
-          />
+          <React.Fragment key={t.key}>
+            <V3Character type={t} idx={i}
+              value={inputs[t.key]}
+              onChange={v=>setInputs(s=>({...s,[t.key]:v}))}
+              onAdd={(size, penColor)=>addNote(t.key, size, penColor)}
+              onAddDraw={(ref, size, penColor)=>addDrawNote(t.key, ref, size, penColor)}
+              onExample={()=>exampleFor(t.key)}
+              count={counts[t.key]}
+              focused={focused===t.key}
+              onFocus={()=>setFocused(t.key)}
+              onBlur={()=>setFocused(null)}
+              onOpenText={(noteSize, penColor)=>setActiveModal({kind:'text', typeKey:t.key, noteSize, penColor})}
+              onOpenDraw={(noteSize, penColor)=>setActiveModal({kind:'draw', typeKey:t.key, noteSize, penColor})}
+            />
+            {i < 3 && (
+              <div className="v3-cycle-arrow" style={{display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', paddingTop:40}}>
+                <span style={{fontFamily:'Jua', fontSize:20, color:'rgba(255,255,255,.9)', textShadow:'0 1px 3px rgba(0,0,0,.25)'}}>→</span>
+              </div>
+            )}
+          </React.Fragment>
         ))}
       </div>
 
@@ -748,10 +811,11 @@ function V3({width=1100, height=1400}){
         @keyframes v3float{0%,100%{transform:translateY(0) rotate(var(--t,0deg))}50%{transform:translateY(-4px) rotate(var(--t,0deg))}}
         @keyframes v3bubblein{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
 
-        /* 태블릿 (≤768px): 4열 → 2열 */
+        /* 태블릿 (≤768px): 4열+화살표 → 2열 */
         @media(max-width:768px){
           .v3-root{padding:20px 16px 40px !important}
           .v3-type-grid{grid-template-columns:1fr 1fr !important; gap:12px !important}
+          .v3-type-grid .v3-cycle-arrow{display:none !important}
           .v3-name-story{grid-template-columns:1fr !important}
           .v3-header h1{font-size:30px !important}
           .v3-board-inner{min-height:340px !important}
@@ -760,6 +824,7 @@ function V3({width=1100, height=1400}){
         @media(max-width:480px){
           .v3-root{padding:14px 10px 32px !important}
           .v3-type-grid{grid-template-columns:1fr !important}
+          .v3-type-grid .v3-cycle-arrow{display:none !important}
           .v3-header h1{font-size:24px !important}
           .v3-bubble{width:140px !important; min-height:120px !important; font-size:13px !important}
         }
@@ -863,10 +928,19 @@ function V3({width=1100, height=1400}){
 
 function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, count, focused, onFocus, onBlur, isDrawMode, onSetDrawMode, onOpenText, onOpenDraw}){
   const [hover, setHover] = React.useState(false);
+  const [showHint, setShowHint] = React.useState(false);
   const [noteSize, setNoteSize] = React.useState('M');
   const [penColor, setPenColor] = React.useState('#2d2a26');
   const composing = React.useRef(false);
   const drawCanvasRef = React.useRef(null);
+  const hintRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!showHint) return;
+    const handler = (e) => { if (hintRef.current && !hintRef.current.contains(e.target)) setShowHint(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showHint]);
   const over = value.length > V3_MAX_CHARS;
   const lean = [-2, 1.5, -1, 2][idx];
   const talking = focused || value.length > 0;
@@ -941,10 +1015,41 @@ function V3Character({type, idx, value, onChange, onAdd, onAddDraw, onExample, c
           }}>{value.length}/{V3_MAX_CHARS}</span>}
         </div>
         <div className="qc-no-print" style={{display:'flex', gap:6, marginTop:8}}>
-          <button onClick={onExample} style={{
-            background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'7px 8px',
-            fontSize:12, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26',
-          }}>💡</button>
+          <div ref={hintRef} style={{position:'relative'}}>
+            <button onClick={()=>setShowHint(h=>!h)} style={{
+              background:'#fff', border:'2px solid #2d2a26', borderRadius:10, padding:'7px 8px',
+              fontSize:12, cursor:'pointer', fontFamily:'Jua', color:'#2d2a26',
+            }}>💡</button>
+            {showHint && (
+              <div style={{
+                position:'absolute', bottom:'calc(100% + 8px)', left:0, zIndex:50,
+                background:'#fff', border:`3px solid ${type.color}`,
+                borderRadius:16, padding:'12px 14px', width:220,
+                boxShadow:`0 6px 0 ${type.deep}`,
+                fontFamily:'Jua',
+              }}>
+                <div style={{fontSize:12, color:type.deep, marginBottom:8}}>{type.hintTip}</div>
+                <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:8}}>
+                  {type.subHints.map((h,i) => (
+                    <span key={i} style={{fontSize:11, background:type.color+'33', color:type.deep, borderRadius:999, padding:'2px 8px', border:`1px solid ${type.color}`}}>{h}</span>
+                  ))}
+                </div>
+                <div style={{fontSize:11, color:'#555', marginBottom:6}}>질문 씨앗:</div>
+                {type.seeds.map((s,i) => (
+                  <button key={i} onClick={()=>{ onChange(s); setShowHint(false); }} style={{
+                    display:'block', width:'100%', textAlign:'left', fontFamily:'Gaegu', fontSize:14,
+                    background:'#fff', border:`1.5px solid ${type.color}`, borderRadius:8, padding:'5px 8px',
+                    color:'#2d2a26', cursor:'pointer', marginBottom:4,
+                  }}>{s}</button>
+                ))}
+                <button onClick={()=>{ onExample(); setShowHint(false); }} style={{
+                  display:'block', width:'100%', textAlign:'center', fontFamily:'Jua', fontSize:12,
+                  background:type.color, border:'none', borderRadius:8, padding:'5px 0',
+                  color:'#fff', cursor:'pointer', marginTop:4,
+                }}>🎲 랜덤 예시</button>
+              </div>
+            )}
+          </div>
           <button onClick={()=>onAdd(noteSize, penColor)} style={{
             flex:1, fontFamily:'Jua', padding:'8px 10px', border:'2px solid #2d2a26', borderRadius:10,
             color:'#2d2a26', cursor:'pointer', fontSize:14, background:'#fff',

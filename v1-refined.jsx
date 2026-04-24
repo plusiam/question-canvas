@@ -9,10 +9,10 @@ const V1_TYPES = [
     desc:'인물이 왜 그렇게 했는지 그 까닭을 생각해 보는 질문이에요. 내 생각을 말해야 해요.' },
   { key:'imagine', label:'상상 질문',  icon:'✨', hint:['', '만약에', ' ~~~~ ?'],             placeholder:'만약에 ~하면 어떻게 될까?',  color:'#7A4FBA', soft:'#DCCCF0', paper:'#EBDFF5',
     desc:'"만약에~"로 시작해서 이야기가 다르게 펼쳐진다면 어떨지 상상하는 질문이에요.' },
-  { key:'mix',     label:'복합 질문',  icon:'🌈',
+  { key:'mix',     label:'맥락 질문',  icon:'🌈',
     color:'#2D3A8A', soft:'#E0E4FF', paper:'#EEF1FF',
     gradient:'linear-gradient(90deg,#2E86C1,#E6A817,#D63384,#7A4FBA)',
-    desc:'두 가지 이상이 섞인 질문이에요. 전제(어떤 상황·감정 가정)와 질문을 나누어 써봐요. 예: 슬펐을 때(느낌) 친구는 무엇을 생각했을까(생각)?' },
+    desc:'이야기의 맥락(상황·감정)을 가정하고 그 위에서 질문을 만들어요. 전제와 질문을 나누어 써봐요. 예: 슬펐을 때(느낌) 친구는 무엇을 생각했을까(생각)?' },
 ];
 
 /* 2×2 그리드와 노트 편집용 기본 4타입 */
@@ -152,7 +152,7 @@ function V1TextModal({ open, onClose, onConfirm, onExample, value, onChange, typ
   );
 }
 
-/* ── 복합 질문 모달 (v1) — 전제 + 질문 이중 입력 ── */
+/* ── 맥락 질문 모달 (v1) — 전제 + 질문 이중 입력 ── */
 function V1MixModal({ open, onClose, onConfirm, onExample, value, onChange, noteSize, onSize }) {
   const taRef = React.useRef(null);
   const preRef = React.useRef(null);
@@ -215,7 +215,7 @@ function V1MixModal({ open, onClose, onConfirm, onExample, value, onChange, note
               display:'flex', alignItems:'center', justifyContent:'center', fontSize:18,
               border:'2px solid #2d2a26',
             }}>🌈</div>
-            <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>복합 질문</span>
+            <span style={{fontFamily:'Jua', fontSize:20, color:'#2d2a26'}}>맥락 질문</span>
           </div>
           <button onClick={onClose} style={{
             fontFamily:'Jua', fontSize:14, padding:'4px 14px', borderRadius:999,
@@ -224,7 +224,7 @@ function V1MixModal({ open, onClose, onConfirm, onExample, value, onChange, note
         </div>
 
         <p style={{fontFamily:'Gaegu', fontSize:17, color:'#7a7064', margin:0, lineHeight:1.4}}>
-          전제(어떤 상황·감정 가정)와 질문을 나눠서 써봐요.
+          이야기 맥락(상황·감정)을 가정하고, 그 위에서 질문을 만들어요.
         </p>
 
         <div style={{display:'flex', alignItems:'center', gap:6}}>
@@ -814,7 +814,7 @@ function V1({width=1100, height=1400}){
         ))}
       </div>
 
-      {/* 복합 질문 카드 — 전폭 */}
+      {/* 맥락 질문 카드 — 전폭 */}
       <div className="v1-mix-wrap qc-no-print" style={{marginTop:18}}>
         <V1MixTypeCard
           value={mixInput}
@@ -842,7 +842,7 @@ function V1({width=1100, height=1400}){
                 fontFamily:'Jua', fontSize:14, padding:'5px 12px', borderRadius:999,
                 color:'#fff', border:'2px solid #2d2a26',
                 background: V1_MIX_TYPE.gradient,
-              }}>🌈 복합 {counts.mix}</span>
+              }}>🌈 맥락 {counts.mix}</span>
             )}
             {allFour && (
               <span style={{
@@ -1031,7 +1031,7 @@ function V1({width=1100, height=1400}){
             height:auto !important;
             min-height:36mm !important;
           }
-          /* 복합 질문 포스트잇 (전제+질문 2단 구조라 더 높음) */
+          /* 맥락 질문 포스트잇 (전제+질문 2단 구조라 더 높음) */
           .v1-note.is-mix{
             height:auto !important;
             min-height:60mm !important;
@@ -1145,7 +1145,7 @@ function V1TypeCard({type, value, onChange, onAdd, onExample, count, onOpenText,
   );
 }
 
-/* 복합 질문 카드 — 전폭, 그라데이션 보더 */
+/* 맥락 질문 카드 — 전폭, 그라데이션 보더 */
 function V1MixTypeCard({ value, count, onOpenMix, onExample }){
   const [h, setH] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
@@ -1178,10 +1178,10 @@ function V1MixTypeCard({ value, count, onOpenMix, onExample }){
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:22,
             border:'2px solid #2d2a26', flexShrink:0,
           }}>🌈</div>
-          <h3 style={{fontFamily:'Jua', fontSize:22, margin:0}}>복합 질문</h3>
+          <h3 style={{fontFamily:'Jua', fontSize:22, margin:0}}>맥락 질문</h3>
           <span style={{
             fontFamily:'Gaegu', fontSize:15, color:'#7a7064',
-          }}>전제 + 질문으로 섞어서</span>
+          }}>맥락(전제) + 질문으로</span>
           <button onClick={()=>setShowDesc(v=>!v)} style={{
             marginLeft:'auto', width:26, height:26, borderRadius:'50%',
             border:`2px solid ${V1_MIX_TYPE.color}`,
@@ -1236,7 +1236,7 @@ function V1MixTypeCard({ value, count, onOpenMix, onExample }){
           <button onClick={onOpenMix} style={{
             flex:1, fontFamily:'Jua', padding:'10px 14px', border:'none', borderRadius:10,
             color:'#fff', cursor:'pointer', fontSize:16, background:V1_MIX_TYPE.color,
-          }}>{hasContent ? '이어서 편집 →' : '+ 복합 질문 만들기'}</button>
+          }}>{hasContent ? '이어서 편집 →' : '+ 맥락 질문 만들기'}</button>
         </div>
       </div>
     </div>
@@ -1321,7 +1321,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
             fontFamily:'Jua', fontSize:12,
             padding:'4px 10px', borderRadius:999, color:'#fff',
             background: V1_MIX_TYPE.gradient, alignSelf:'flex-start',
-          }}>🌈 복합 질문</div>
+          }}>🌈 맥락 질문</div>
         ) : (
           <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
             {V1_BASIC_TYPES.map(t=>(
@@ -1436,7 +1436,7 @@ function V1Note({note, type, onDel, onUpdate, onMove}){
           <span style={{
             display:'inline-block', fontFamily:'Jua', fontSize:11, padding:'2px 8px',
             borderRadius:999, color:'#fff', marginBottom:6, background:V1_MIX_TYPE.gradient,
-          }}>🌈 복합</span>
+          }}>🌈 맥락</span>
           <div style={{
             fontSize:'0.82em', padding:'4px 8px', borderRadius:6, marginBottom:4,
             background:mixPre.paper, border:`1px dashed ${mixPre.soft}`, lineHeight:1.3,
